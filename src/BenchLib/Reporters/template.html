@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{title}}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+      h1 {
+        margin: 0;
+        padding: 0;
+        padding-bottom: 20px;
+      }
+      h2 {
+        margin: 0;
+        padding: 0;
+        padding-bottom: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <script>
+      /* config start */
+      const config = {
+        lineStyles: [
+          { color: { r: 255, g: 99, b: 132 }, width: 2, opacity: 0.5 },
+          { color: { r: 54, g: 162, b: 235 }, width: 2, opacity: 0.5 },
+          { color: { r: 255, g: 206, b: 86 }, width: 2, opacity: 0.5 },
+        ],
+        transparencies: [0.5],
+        data: {
+          suiteName: "Sample Bench Suite",
+          groups: [
+            {
+              groupName: "Add item to front",
+              benchs: [
+                {
+                  benchName: "Array.cons",
+                  size: 1,
+                  duration: 0.1,
+                },
+                {
+                  benchName: "Array.cons",
+                  size: 2,
+                  duration: 0.2,
+                },
+                {
+                  benchName: "Array.cons",
+                  size: 3,
+                  duration: 0.3,
+                },
+                {
+                  benchName: "List.cons",
+                  size: 1,
+                  duration: 0.2,
+                },
+                {
+                  benchName: "List.cons",
+                  size: 2,
+                  duration: 0.4,
+                },
+                {
+                  benchName: "List.cons",
+                  size: 3,
+                  duration: 0.6,
+                },
+              ],
+            },
+            {
+              groupName: "Add item to end",
+              benchs: [
+                {
+                  benchName: "Array.snoc",
+                  size: 1,
+                  duration: 0.1,
+                },
+                {
+                  benchName: "Array.snoc",
+                  size: 2,
+                  duration: 0.2,
+                },
+                {
+                  benchName: "Array.snoc",
+                  size: 3,
+                  duration: 0.3,
+                },
+
+                {
+                  benchName: "List.snoc",
+                  size: 1,
+                  duration: 0.2,
+                },
+                {
+                  benchName: "List.snoc",
+                  size: 2,
+                  duration: 0.4,
+                },
+                {
+                  benchName: "List.snoc",
+                  size: 3,
+                  duration: 0.6,
+                },
+              ],
+            },
+          ],
+        },
+      };
+      /* config end */
+
+      function renderCharts(dataConfig) {
+        const container = document.createElement("div");
+        container.style.maxWidth = "600px";
+        container.style.margin = "0 auto";
+        container.style.padding = "20px";
+
+        const header = document.createElement("h1");
+        header.textContent = dataConfig.suiteName;
+        container.appendChild(header);
+
+        document.body.appendChild(container);
+
+        dataConfig.groups.forEach((group, groupIndex) => {
+          const chartContainer = document.createElement("div");
+          chartContainer.style.marginBottom = "40px";
+
+          const title = document.createElement("h2");
+          title.textContent = group.groupName;
+          chartContainer.appendChild(title);
+
+          const canvas = document.createElement("canvas");
+          canvas.id = `chart-${groupIndex}`;
+          chartContainer.appendChild(canvas);
+
+          container.appendChild(chartContainer);
+
+          const labels = [...new Set(group.benchs.map((bench) => bench.size))];
+
+          const datasets = Object.values(
+            group.benchs.reduce((acc, bench, index) => {
+              if (!acc[bench.benchName]) {
+                const style =
+                  config.lineStyles[index % config.lineStyles.length];
+                const rgbaColor = `rgba(${style.color.r}, ${style.color.g}, ${style.color.b}, ${style.opacity})`;
+
+                acc[bench.benchName] = {
+                  label: bench.benchName,
+                  data: [],
+                  borderColor: rgbaColor,
+                  borderWidth: style.width,
+                  backgroundColor: rgbaColor,
+                  fill: false,
+                  tension: 0.1,
+                };
+              }
+              acc[bench.benchName].data.push(bench.duration);
+              return acc;
+            }, {})
+          );
+
+          new Chart(canvas.getContext("2d"), {
+            type: "line",
+            data: {
+              labels: labels,
+              datasets: datasets,
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: {
+                  display: true,
+                },
+              },
+              scales: {
+                x: {
+                  type: "linear",
+                  title: {
+                    display: true,
+                    text: "Input Size",
+                  },
+                },
+                y: {
+                  max: (ctx) => {
+                    const maxValue = Math.max(
+                      ...ctx.chart.data.datasets.flatMap((ds) => ds.data)
+                    );
+                    return Math.max(maxValue, 10);
+                  },
+                  title: {
+                    display: true,
+
+                    text: "Average Time (ms)",
+                  },
+                },
+              },
+            },
+          });
+        });
+      }
+
+      renderCharts(config.data);
+    </script>
+  </body>
+</html>

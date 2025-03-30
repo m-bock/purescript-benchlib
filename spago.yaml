@@ -1,0 +1,17 @@
+package:
+  name: benchlib
+  dependencies:
+      - console
+      - effect
+      - spec
+      - nullable
+      - node-fs
+      - codec-argonaut
+      - argonaut
+  test:
+    main: Test.Main
+    dependencies: []
+workspace:
+  packageSet:
+    registry: 63.8.0
+  extraPackages: {}
