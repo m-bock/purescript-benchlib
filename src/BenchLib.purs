@@ -1,11 +1,11 @@
 module BenchLib
-  ( BenchResult
+  ( Bench
+  , BenchResult
   , Group
   , GroupResults
   , Reporter
   , Size
   , Suite
-  , Bench
   , SuiteResults
   , bench
   , benchGroup
@@ -15,6 +15,7 @@ module BenchLib
   , benchSuite
   , benchSuite_
   , bench_
+  , checkEq
   , class MonadBench
   , defaultReporter
   , eval
@@ -22,7 +23,8 @@ module BenchLib
   , reportConsole
   , run
   , toAff
-  ) where
+  )
+  where
 
 import Prelude
 
@@ -378,48 +380,34 @@ asciColorStr color str =
   in
     colorCode <> str <> resetCode
 
-asciColors =
-  { red: 31
-  , green: 32
-  , yellow: 33
-  , blue: 34
-  , magenta: 35
-  , cyan: 36
-  , white: 37
-  , black: 30
-  , brightRed: 91
-  , brightGreen: 92
-  , brightYellow: 93
-  , brightBlue: 94
-  , brightMagenta: 95
-  , brightCyan: 96
-  , brightWhite: 97
-  , brightBlack: 90
-  , bgRed: 41
-  , bgGreen: 42
-  , bgYellow: 43
-  , bgBlue: 44
-  , bgMagenta: 45
-  , bgCyan: 46
-  , bgWhite: 47
-  , bgBlack: 40
-  , bgGray: 100
-  }
+bgGray :: Int
+bgGray = 100
 
 reportConsole :: Reporter
 reportConsole = defaultReporter
-  { onSuiteStart = \name -> Console.log ("• suite: " <> name)
-  , onGroupStart = \name -> Console.log ("  • group: " <> name)
-  , onSizeStart = \size -> Console.log ("    • size: " <> show size)
-  , onBenchStart = \{ benchName, size } -> Console.log ("      • " <> (asciColorStr asciColors.bgGray ("bench: " <> benchName <> " (size = " <> show size <> ")")))
-  , onBenchFinish = \{ benchName, size, duration: Milliseconds dur, iterations } -> do
-      Console.log ("        • mean duration: " <> show dur <> " ms (" <> show iterations <> " iterations)\n")
-  , onCheckResults = \{ success, results } -> do
-      if success then
-        Console.log ("      • check: ✓")
+  { onSuiteStart = \name -> Console.log
+      ("• suite: " <> name)
+
+  , onGroupStart = \name -> Console.log
+      ("  • group: " <> name)
+
+  , onSizeStart = \size -> Console.log
+      ("    • size: " <> show size)
+
+  , onBenchStart = \{ benchName, size } -> Console.log
+      ("      • " <> (asciColorStr bgGray ("bench: " <> benchName <> " (size = " <> show size <> ")")))
+
+  , onBenchFinish = \{ duration: Milliseconds dur, iterations } -> Console.log
+      ("        • mean duration: " <> show dur <> " ms (" <> show iterations <> " iterations)\n")
+
+  , onCheckResults = \{ success, results } ->
+      if success then Console.log
+        ("      • check: ✓")
       else do
-        Console.log ("       • check: ✗")
-        for_ results \{ benchName, output } -> Console.log ("          • " <> benchName <> ": " <> output)
+        Console.log
+          ("       • check: ✗")
+        for_ results \{ benchName, output } -> Console.log 
+          ("          • " <> benchName <> ": " <> output)
   }
 
 defaultReporter :: Reporter
