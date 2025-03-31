@@ -23,8 +23,7 @@ module BenchLib
   , reportConsole
   , run
   , toAff
-  )
-  where
+  ) where
 
 import Prelude
 
@@ -150,9 +149,6 @@ eval (Suite suite) = suite.run defaultSuiteOpts
 
 ---
 
-notOnly :: forall a. a -> MayOnly a
-notOnly a = { only: false, val: a }
-
 checkEq :: forall a. Eq a => Array a -> Boolean
 checkEq items =
   let
@@ -190,11 +186,7 @@ mkDefaultBenchOpts { iterations, reporters } =
   , reporters
   }
 
----
-runReporters :: Array Reporter -> (Reporter -> Effect Unit) -> Aff Unit
-runReporters reporters f = liftEffect $ for_ reporters f
-
----
+--- Bench functions
 
 benchSuite :: String -> (SuiteOpts -> SuiteOpts) -> Array Group -> Suite
 benchSuite suiteName mkOpts groups_ = Suite
@@ -254,15 +246,6 @@ benchGroup groupName mkOpts benches_ = Group $ notOnly
       pure groupResults
   }
 
-class Monad m <= MonadBench m where
-  toAff :: forall a. m a -> Aff a
-
-instance MonadBench Effect where
-  toAff = liftEffect
-
-instance MonadBench Aff where
-  toAff = identity
-
 benchImpl :: forall m a b c. Eq c => MonadBench m => String -> (BenchOptsPure Unit c c -> BenchOptsM m a b c) -> (a -> m b) -> Bench c
 benchImpl benchName mkOpts benchFn = Bench $ notOnly
   { benchName
@@ -301,13 +284,18 @@ benchImpl benchName mkOpts benchFn = Bench $ notOnly
       pure (benchResult /\ output)
   }
 
-benchOptsPureToAff :: forall @m a b c. Applicative m => BenchOptsPure a b c -> BenchOptsM m a b c
-benchOptsPureToAff { iterations, prepare, finalize, reporters } =
-  { iterations
-  , prepare: \size -> pure $ prepare size
-  , finalize: \result -> pure $ finalize result
-  , reporters
-  }
+--- MonadBench
+
+class Monad m <= MonadBench m where
+  toAff :: forall a. m a -> Aff a
+
+instance MonadBench Effect where
+  toAff = liftEffect
+
+instance MonadBench Aff where
+  toAff = identity
+
+--- API shortcuts
 
 bench :: forall a b c. Eq c => String -> (BenchOptsPure Unit c c -> BenchOptsPure a b c) -> (a -> b) -> Bench c
 bench name mkOpts benchFn = benchImpl name (benchOptsPureToAff @Effect <<< mkOpts) (pure <<< benchFn)
@@ -321,12 +309,13 @@ benchM name mkOpts benchFn = benchImpl name (mkOpts <<< benchOptsPureToAff) benc
 benchM_ :: forall @m c. Eq c => MonadBench m => String -> (Unit -> m c) -> Bench c
 benchM_ name benchFn = benchM name identity benchFn
 
-mayGetOnlies :: forall a. Array (MayOnly a) -> Array a
-mayGetOnlies mayOnlies =
-  let
-    onlys = filter _.only mayOnlies
-  in
-    map _.val $ if Array.null onlys then mayOnlies else onlys
+benchSuite_ :: String -> Array Group -> Suite
+benchSuite_ groupName benchmarks = benchSuite groupName identity benchmarks
+
+benchGroup_ :: forall @a. Eq a => Show a => String -> Array (Bench a) -> Group
+benchGroup_ groupName benches = benchGroup groupName identity benches
+
+---
 
 checkResults :: forall r a. Show a => Eq a => GroupOpts -> Array { benchName :: String, output :: a | r } -> Aff Unit
 checkResults groupOpts results_ =
@@ -346,8 +335,31 @@ checkResults groupOpts results_ =
   where
   results = map (\({ benchName, output }) -> { benchName, output: show output }) results_
 
+--- Utils
+
+runReporters :: Array Reporter -> (Reporter -> Effect Unit) -> Aff Unit
+runReporters reporters f = liftEffect $ for_ reporters f
+
+benchOptsPureToAff :: forall @m a b c. Applicative m => BenchOptsPure a b c -> BenchOptsM m a b c
+benchOptsPureToAff { iterations, prepare, finalize, reporters } =
+  { iterations
+  , prepare: \size -> pure $ prepare size
+  , finalize: \result -> pure $ finalize result
+  , reporters
+  }
+
+mayGetOnlies :: forall a. Array (MayOnly a) -> Array a
+mayGetOnlies mayOnlies =
+  let
+    onlys = filter _.only mayOnlies
+  in
+    map _.val $ if Array.null onlys then mayOnlies else onlys
+
 only :: forall a. MayOnly a -> MayOnly a
 only { val } = { val, only: true }
+
+notOnly :: forall a. a -> MayOnly a
+notOnly a = { only: false, val: a }
 
 measureTime :: forall a m. MonadEffect m => (Unit -> m a) -> m (a /\ Milliseconds)
 measureTime action = do
@@ -357,20 +369,8 @@ measureTime action = do
   let duration = unwrap (unInstant endTime) - unwrap (unInstant startTime)
   pure (result /\ Milliseconds duration)
 
---- Utils ---
-
 calcMean :: NonEmptyList Milliseconds -> Milliseconds
 calcMean items = Milliseconds (sum (map coerce items :: NonEmptyList Number) / Int.toNumber (NEL.length items))
-
----
-
-benchSuite_ :: String -> Array Group -> Suite
-benchSuite_ groupName benchmarks = benchSuite groupName identity benchmarks
-
-benchGroup_ :: forall @a. Eq a => Show a => String -> Array (Bench a) -> Group
-benchGroup_ groupName benches = benchGroup groupName identity benches
-
----
 
 asciColorStr :: Int -> String -> String
 asciColorStr color str =
@@ -382,6 +382,33 @@ asciColorStr color str =
 
 bgGray :: Int
 bgGray = 100
+
+memoizeEffect :: forall a b. Ord a => (a -> b) -> Effect (a -> Effect b)
+memoizeEffect f = do
+  cacheRef <- Ref.new Map.empty
+  pure \x -> do
+    cache <- Ref.read cacheRef
+    case Map.lookup x cache of
+      Just result -> pure result
+      Nothing -> do
+        let result = f x
+        Ref.modify_ (Map.insert x result) cacheRef
+        pure result
+
+-- Reporter
+
+defaultReporter :: Reporter
+defaultReporter =
+  { onSuiteStart: const $ pure unit
+  , onGroupStart: const $ pure unit
+  , onSizeStart: const $ pure unit
+  , onBenchStart: const $ pure unit
+  , onSuiteFinish: const $ pure unit
+  , onGroupFinish: const $ pure unit
+  , onSizeFinish: const $ pure unit
+  , onBenchFinish: const $ pure unit
+  , onCheckResults: const $ pure unit
+  }
 
 reportConsole :: Reporter
 reportConsole = defaultReporter
@@ -406,31 +433,7 @@ reportConsole = defaultReporter
       else do
         Console.log
           ("       • check: ✗")
-        for_ results \{ benchName, output } -> Console.log 
+        for_ results \{ benchName, output } -> Console.log
           ("          • " <> benchName <> ": " <> output)
   }
 
-defaultReporter :: Reporter
-defaultReporter =
-  { onSuiteStart: const $ pure unit
-  , onGroupStart: const $ pure unit
-  , onSizeStart: const $ pure unit
-  , onBenchStart: const $ pure unit
-  , onSuiteFinish: const $ pure unit
-  , onGroupFinish: const $ pure unit
-  , onSizeFinish: const $ pure unit
-  , onBenchFinish: const $ pure unit
-  , onCheckResults: const $ pure unit
-  }
-
-memoizeEffect :: forall a b. Ord a => (a -> b) -> Effect (a -> Effect b)
-memoizeEffect f = do
-  cacheRef <- Ref.new Map.empty
-  pure \x -> do
-    cache <- Ref.read cacheRef
-    case Map.lookup x cache of
-      Just result -> pure result
-      Nothing -> do
-        let result = f x
-        Ref.modify_ (Map.insert x result) cacheRef
-        pure result
