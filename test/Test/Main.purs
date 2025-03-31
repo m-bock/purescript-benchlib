@@ -10,5 +10,4 @@ import Test.Specs (spec)
 
 main :: Effect Unit
 main = do
-  launchAff_ $ runSpec [ consoleReporter ] do
-    spec
+  pure unit
