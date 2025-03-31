@@ -1,9 +1,9 @@
-module BenchLib.Reporters.ChartJsHtml
+module BenchLib.Reporters.Html
   ( Color
   , LineStyle
   , Opts
-  , reportChartJs
-  , reportChartJs_
+  , reportHtml
+  , reportHtml_
   ) where
 
 import Prelude
@@ -87,8 +87,8 @@ writeHtml opts suiteResults = do
   let out = foldl (\acc { regex, replacement } -> Regex.replace regex replacement acc) template replacements
   FS.writeTextFile UTF8 opts.filePath out
 
-reportChartJs :: (Opts -> Opts) -> Reporter
-reportChartJs mkOpts =
+reportHtml :: (Opts -> Opts) -> Reporter
+reportHtml mkOpts =
   let
     opts = mkOpts defaultOpts
   in
@@ -98,8 +98,8 @@ reportChartJs mkOpts =
           Console.error ("Wrote HTML report to " <> opts.filePath)
       }
 
-reportChartJs_ :: Reporter
-reportChartJs_ = reportChartJs identity
+reportHtml_ :: Reporter
+reportHtml_ = reportHtml identity
 
 indent :: String -> String -> String
 indent indentStr str = Str.split (Pattern pat) str # map (indentStr <> _) # Str.joinWith pat

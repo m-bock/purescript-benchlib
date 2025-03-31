@@ -4,7 +4,7 @@ import Prelude
 
 import BenchLib (bench, benchGroup_, benchSuite, reportConsole)
 import BenchLib as BenchLib
-import BenchLib.Reporters.ChartJsHtml (reportChartJs_)
+import BenchLib.Reporters.Html (reportHtml_)
 import BenchLib.Reporters.Json (reportJson_)
 import Data.List (List)
 import Data.List as List
@@ -23,13 +23,13 @@ main = do
       -- set suite options by overriding default config:
       ( \cfg -> cfg
           { iterations = 1000 -- number of iterations each benchmark will run
-          , sizes = [ 20_000, 40_000, 80_000 ] -- input sizes to be passed to benchmark prepare functions
+          , sizes = [ 20_000, 40_000, 80_000 ] -- input sizes for prepare functions
 
           -- different reporters depending on your needs:
           , reporters =
               [ reportConsole -- Simply logs benchmarks to the console
-              , reportJson_ -- Writes benchmarks as JSON to a file
-              , reportChartJs_ -- Writes benchmarks to a HTML file. Uses Chart.js for visualization.
+              , reportJson_ -- Writes benchmarks to JSON file
+              , reportHtml_ -- Writes benchmarks to HTML file
               ]
           }
       )
@@ -38,7 +38,7 @@ main = do
               "Add item to the front of a list"
               -- set benchmark options:
               ( \cfg -> cfg
-                  { prepare = \size -> mkItems size -- runs before each benchmark function
+                  { prepare = \size -> mkItems size -- runs before each benchmark
                   }
               )
               -- benchmark function:
@@ -48,7 +48,7 @@ main = do
               "Add item to the end of a list"
               -- set benchmark options:
               ( \cfg -> cfg
-                  { prepare = \size -> mkItems size -- runs before each benchmark function
+                  { prepare = \size -> mkItems size -- runs before each benchmark
                   }
               )
               -- benchmark function:
