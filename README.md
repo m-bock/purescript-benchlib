@@ -71,7 +71,7 @@ Run the benchmarks in a terminal
 spago run -m Test.Samples.Simple
 ```
 
-The result will look like:
+The result console output will look like:
 
 ```bash
 • suite: Simple Example
