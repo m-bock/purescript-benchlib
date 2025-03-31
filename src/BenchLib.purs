@@ -1,8 +1,11 @@
 module BenchLib
   ( BenchResult
+  , Group
   , GroupResults
   , Reporter
   , Size
+  , Suite
+  , Bench
   , SuiteResults
   , bench
   , benchGroup
@@ -104,20 +107,24 @@ type BenchResult =
 
 ---
 
-type Suite =
+newtype Suite = Suite
   { suiteName :: String
   , run :: SuiteOpts -> Aff SuiteResults
   }
 
-type Group = MayOnly
-  { groupName :: String
-  , run :: GroupOpts -> Aff GroupResults
-  }
+newtype Group = Group
+  ( MayOnly
+      { groupName :: String
+      , run :: GroupOpts -> Aff GroupResults
+      }
+  )
 
-type Bench out = MayOnly
-  { benchName :: String
-  , run :: BenchOptsPure Unit out out -> Size -> Aff (BenchResult /\ out)
-  }
+newtype Bench out = Bench
+  ( MayOnly
+      { benchName :: String
+      , run :: BenchOptsPure Unit out out -> Size -> Aff (BenchResult /\ out)
+      }
+  )
 
 ---
 
@@ -137,7 +144,7 @@ run :: Suite -> Effect Unit
 run suite = launchAff_ $ void $ eval suite
 
 eval :: Suite -> Aff SuiteResults
-eval suite = suite.run defaultSuiteOpts
+eval (Suite suite) = suite.run defaultSuiteOpts
 
 ---
 
@@ -188,12 +195,12 @@ runReporters reporters f = liftEffect $ for_ reporters f
 ---
 
 benchSuite :: String -> (SuiteOpts -> SuiteOpts) -> Array Group -> Suite
-benchSuite suiteName mkOpts groups_ =
+benchSuite suiteName mkOpts groups_ = Suite
   { suiteName
   , run: \_ -> do
       let opts = mkOpts defaultSuiteOpts
 
-      let groups = mayGetOnlies groups_
+      let groups = mayGetOnlies (map (\(Group g) -> g) groups_)
 
       runReporters opts.reporters \rep -> rep.onSuiteStart suiteName
 
@@ -208,7 +215,7 @@ benchSuite suiteName mkOpts groups_ =
   }
 
 benchGroup :: forall @a. Eq a => Show a => String -> (GroupOpts -> GroupOpts) -> Array (Bench a) -> Group
-benchGroup groupName mkOpts benches_ = notOnly
+benchGroup groupName mkOpts benches_ = Group $ notOnly
   { groupName
   , run: \defOpts -> do
 
@@ -216,7 +223,7 @@ benchGroup groupName mkOpts benches_ = notOnly
 
       runReporters groupOpts.reporters \rep -> rep.onGroupStart groupName
 
-      let benches = mayGetOnlies benches_
+      let benches = mayGetOnlies $ map (\(Bench b) -> b) benches_
 
       results <- for groupOpts.sizes
         ( \size -> do
@@ -255,7 +262,7 @@ instance MonadBench Aff where
   toAff = identity
 
 benchImpl :: forall m a b c. Eq c => MonadBench m => String -> (BenchOptsPure Unit c c -> BenchOptsM m a b c) -> (a -> m b) -> Bench c
-benchImpl benchName mkOpts benchFn = notOnly
+benchImpl benchName mkOpts benchFn = Bench $ notOnly
   { benchName
   , run: \defOpts size -> do
 
@@ -404,7 +411,7 @@ reportConsole = defaultReporter
   { onSuiteStart = \name -> Console.log ("• suite: " <> name)
   , onGroupStart = \name -> Console.log ("  • group: " <> name)
   , onSizeStart = \size -> Console.log ("    • size: " <> show size)
-  , onBenchStart = \{benchName, size} -> Console.log ("      • " <> (asciColorStr asciColors.bgGray ("bench: " <> benchName <> " (size = " <> show size <> ")")))
+  , onBenchStart = \{ benchName, size } -> Console.log ("      • " <> (asciColorStr asciColors.bgGray ("bench: " <> benchName <> " (size = " <> show size <> ")")))
   , onBenchFinish = \{ benchName, size, duration: Milliseconds dur, iterations } -> do
       Console.log ("        • mean duration: " <> show dur <> " ms (" <> show iterations <> " iterations)\n")
   , onCheckResults = \{ success, results } -> do

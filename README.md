@@ -15,7 +15,6 @@ import BenchLib (bench, benchGroup_, benchSuite, reportConsole)
 import BenchLib as BenchLib
 import BenchLib.Reporters.Html (reportHtml_)
 import BenchLib.Reporters.Json (reportJson_)
-import Data.List (List)
 import Data.List as List
 import Effect (Effect)
 ```
@@ -25,50 +24,45 @@ import Effect (Effect)
 
 ```purescript
 main :: Effect Unit
-main = do
-  let
-    mkItems :: Int -> List Int
-    mkItems n = List.range 1 n
+main = BenchLib.run $
+  benchSuite
+    "Simple Example"
 
-  BenchLib.run $
-    benchSuite
-      "Simple Example"
+    -- set suite options by overriding default config:
+    ( \cfg -> cfg
+        { iterations = 1000 -- number of iterations each benchmark will run
+        , sizes = [ 20_000, 40_000, 80_000 ] -- input sizes for prepare functions
 
-      -- set suite options by overriding default config:
-      ( \cfg -> cfg
-          { iterations = 1000 -- number of iterations each benchmark will run
-          , sizes = [ 20_000, 40_000, 80_000 ] -- input sizes for prepare functions
+        -- different reporters depending on your needs:
+        , reporters =
+            [ reportConsole -- Simply logs benchmarks to the console
+            , reportJson_ -- Writes benchmarks to JSON file
+            , reportHtml_ -- Writes benchmarks to HTML file
+            ]
+        }
+    )
+    [ benchGroup_ "List operations"
+        [ bench
+            "Add item to the front of a list"
+            -- set benchmark options:
+            ( \cfg -> cfg
+                { prepare = \size -> List.range 1 size -- runs before each benchmark
+                }
+            )
+            -- benchmark function:
+            (\items -> List.Cons 0 items)
 
-          -- different reporters depending on your needs:
-          , reporters =
-              [ reportConsole -- Simply logs benchmarks to the console
-              , reportJson_ -- Writes benchmarks to JSON file
-              , reportHtml_ -- Writes benchmarks to HTML file
-              ]
-          }
-      )
-      [ benchGroup_ "List operations"
-          [ bench
-              "Add item to the front of a list"
-              -- set benchmark options:
-              ( \cfg -> cfg
-                  { prepare = \size -> mkItems size -- runs before each benchmark
-                  }
-              )
-              -- benchmark function:
-              (\items -> List.Cons 0 items)
-
-          , bench
-              "Add item to the end of a list"
-              -- set benchmark options:
-              ( \cfg -> cfg
-                  { prepare = \size -> mkItems size -- runs before each benchmark
-                  }
-              )
-              -- benchmark function:
-              (\items -> List.snoc items 0)
-          ]
-      ]
+        , bench
+            "Add item to the end of a list"
+            -- set benchmark options:
+            ( \cfg -> cfg
+                { prepare = \size -> List.range 1 size -- runs before each benchmark
+                }
+            )
+            -- benchmark function:
+            (\items -> List.snoc items 0)
+        ]
+    ]
 ```
 
 Run the benchmarks in a terminal
@@ -107,6 +101,8 @@ Wrote JSON report to bench-results.json
 Wrote HTML report to bench-results.html
 ```
 
-The visualization will look like:
+The HTML report in `bench-results.html` will look like:
 
 ![ChartJs output](docs/screenshot-simple-results.png)
+
+It clearly demonstrates that List.Cons operates in constant time (O(1)), whereas List.snoc requires linear time (O(n)).
