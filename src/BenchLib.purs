@@ -1,19 +1,20 @@
-module Test.BenchLib
+module BenchLib
   ( BenchResult
   , GroupResults
   , Reporter
   , Size
   , SuiteResults
   , bench
-  , benchM
-  , benchM_
   , benchGroup
   , benchGroup_
+  , benchM
+  , benchM_
   , benchSuite
   , benchSuite_
   , bench_
   , class MonadBench
   , defaultReporter
+  , eval
   , only
   , reportConsole
   , run
@@ -64,7 +65,7 @@ type SuiteOpts =
 type GroupOpts =
   { sizes :: Array Int
   , iterations :: Int
-  , check :: forall a. Eq a => Array a -> Boolean
+  , check :: Maybe (forall a. Eq a => Array a -> Boolean)
   , reporters :: Array Reporter
   }
 
@@ -124,7 +125,7 @@ type Reporter =
   { onSuiteStart :: String -> Effect Unit
   , onGroupStart :: String -> Effect Unit
   , onSizeStart :: Size -> Effect Unit
-  , onBenchStart :: String -> Effect Unit
+  , onBenchStart :: { benchName :: String, size :: Size } -> Effect Unit
   , onSuiteFinish :: SuiteResults -> Effect Unit
   , onGroupFinish :: GroupResults -> Effect Unit
   , onSizeFinish :: Size -> Effect Unit
@@ -133,7 +134,10 @@ type Reporter =
   }
 
 run :: Suite -> Effect Unit
-run suite = launchAff_ $ void $ suite.run defaultSuiteOpts
+run suite = launchAff_ $ void $ eval suite
+
+eval :: Suite -> Aff SuiteResults
+eval suite = suite.run defaultSuiteOpts
 
 ---
 
@@ -156,7 +160,7 @@ checkEq items =
 
 defaultSuiteOpts :: SuiteOpts
 defaultSuiteOpts =
-  { sizes: [ 1, 10, 100, 1_000, 10_000 ]
+  { sizes: [ 0, 10, 100 ]
   , iterations: 1000
   , reporters: [ reportConsole ]
   }
@@ -165,7 +169,7 @@ mkDefaultGroupOpts :: SuiteOpts -> GroupOpts
 mkDefaultGroupOpts { sizes, iterations, reporters } =
   { sizes
   , iterations
-  , check: checkEq
+  , check: Nothing
   , reporters
   }
 
@@ -257,7 +261,7 @@ benchImpl benchName mkOpts benchFn = notOnly
 
       let opts@{ iterations } = mkOpts defOpts
 
-      runReporters opts.reporters \rep -> rep.onBenchStart benchName
+      runReporters opts.reporters \rep -> rep.onBenchStart { benchName, size }
 
       durs :: NonEmptyList _ <- replicate1A iterations do
 
@@ -305,7 +309,7 @@ bench_ name benchFn = bench name identity benchFn
 benchM :: forall m a b c. MonadBench m => Eq c => String -> (BenchOptsM m Unit c c -> BenchOptsM m a b c) -> (a -> m b) -> Bench c
 benchM name mkOpts benchFn = benchImpl name (mkOpts <<< benchOptsPureToAff) benchFn
 
-benchM_ :: forall m c. Eq c => MonadBench m => String -> (Unit -> m c) -> Bench c
+benchM_ :: forall @m c. Eq c => MonadBench m => String -> (Unit -> m c) -> Bench c
 benchM_ name benchFn = benchM name identity benchFn
 
 mayGetOnlies :: forall a. Array (MayOnly a) -> Array a
@@ -317,17 +321,19 @@ mayGetOnlies mayOnlies =
 
 checkResults :: forall r a. Show a => Eq a => GroupOpts -> Array { benchName :: String, output :: a | r } -> Aff Unit
 checkResults groupOpts results_ =
-  if (groupOpts.check (map _.output results_)) then do
-    runReporters groupOpts.reporters \rep -> rep.onCheckResults
-      { success: true
-      , results
-      }
-  else do
-    runReporters groupOpts.reporters \rep -> rep.onCheckResults
-      { success: false
-      , results
-      }
-    throwError (error "Benchmarks results are not equal")
+  for_ groupOpts.check \check -> do
+
+    if (check (map _.output results_)) then do
+      runReporters groupOpts.reporters \rep -> rep.onCheckResults
+        { success: true
+        , results
+        }
+    else do
+      runReporters groupOpts.reporters \rep -> rep.onCheckResults
+        { success: false
+        , results
+        }
+      throwError (error "Benchmarks results are not equal")
   where
   results = map (\({ benchName, output }) -> { benchName, output: show output }) results_
 
@@ -357,18 +363,56 @@ benchGroup_ groupName benches = benchGroup groupName identity benches
 
 ---
 
+asciColorStr :: Int -> String -> String
+asciColorStr color str =
+  let
+    colorCode = "\x1b[" <> show color <> "m"
+    resetCode = "\x1b[0m"
+  in
+    colorCode <> str <> resetCode
+
+asciColors =
+  { red: 31
+  , green: 32
+  , yellow: 33
+  , blue: 34
+  , magenta: 35
+  , cyan: 36
+  , white: 37
+  , black: 30
+  , brightRed: 91
+  , brightGreen: 92
+  , brightYellow: 93
+  , brightBlue: 94
+  , brightMagenta: 95
+  , brightCyan: 96
+  , brightWhite: 97
+  , brightBlack: 90
+  , bgRed: 41
+  , bgGreen: 42
+  , bgYellow: 43
+  , bgBlue: 44
+  , bgMagenta: 45
+  , bgCyan: 46
+  , bgWhite: 47
+  , bgBlack: 40
+  , bgGray: 100
+  }
+
 reportConsole :: Reporter
 reportConsole = defaultReporter
-  { onSuiteStart = \name -> Console.error ("• suite: " <> name)
-  , onGroupStart = \name -> Console.error ("  • group: " <> name)
-  , onSizeStart = \size -> Console.error ("    • size: " <> show size)
-  , onBenchStart = \name -> Console.error ("      • bench: " <> name)
+  { onSuiteStart = \name -> Console.log ("• suite: " <> name)
+  , onGroupStart = \name -> Console.log ("  • group: " <> name)
+  , onSizeStart = \size -> Console.log ("    • size: " <> show size)
+  , onBenchStart = \{benchName, size} -> Console.log ("      • " <> (asciColorStr asciColors.bgGray ("bench: " <> benchName <> " (size = " <> show size <> ")")))
+  , onBenchFinish = \{ benchName, size, duration: Milliseconds dur, iterations } -> do
+      Console.log ("        • mean duration: " <> show dur <> " ms (" <> show iterations <> " iterations)\n")
   , onCheckResults = \{ success, results } -> do
       if success then
-        Console.error ("      • check: ✓")
+        Console.log ("      • check: ✓")
       else do
-        Console.error ("       • check: ✗")
-        for_ results \{ benchName, output } -> Console.error ("          • " <> benchName <> ": " <> output)
+        Console.log ("       • check: ✗")
+        for_ results \{ benchName, output } -> Console.log ("          • " <> benchName <> ": " <> output)
   }
 
 defaultReporter :: Reporter

@@ -10,7 +10,10 @@ package:
       - argonaut
   test:
     main: Test.Main
-    dependencies: []
+    dependencies:
+      - console
+      - effect
+      - spec
 workspace:
   packageSet:
     registry: 63.8.0

@@ -1,4 +1,4 @@
-module Test.BenchLib.Reporters.ChartJsHtml
+module BenchLib.Reporters.ChartJsHtml
   ( Color
   , LineStyle
   , Opts
@@ -22,8 +22,8 @@ import Effect (Effect)
 import Effect.Class.Console as Console
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync as FS
-import Test.BenchLib (Reporter, SuiteResults, defaultReporter)
-import Test.BenchLib.Reporters.Json (codecSuiteResults)
+import BenchLib (Reporter, SuiteResults, defaultReporter)
+import BenchLib.Reporters.Json (codecSuiteResults)
 
 type Opts =
   { lineStyles :: Array LineStyle

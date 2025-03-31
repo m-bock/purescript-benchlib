@@ -19,7 +19,6 @@ import Effect (Effect)
 
 </details>
 
-<br>
 
 ```purescript
 main :: Effect Unit
@@ -38,4 +37,37 @@ main = do
               (\_ -> List.snoc items 0)
           ]
       ]
+```
+
+Run the benchmarks in a terminal
+
+```bash
+spago run -m Test.Samples.Simple
+```
+
+The result will look like:
+
+```bash
+• suite: Simple Example
+  • group: List operations
+    • size: 0
+      • bench: Add item to the front of a list (size = 0)
+        • mean duration: 0.001 ms (1000 iterations)
+
+      • bench: Add item to the end of a list (size = 0)
+        • mean duration: 19.4 ms (1000 iterations)
+
+    • size: 10
+      • bench: Add item to the front of a list (size = 10)
+        • mean duration: 0.001 ms (1000 iterations)
+
+      • bench: Add item to the end of a list (size = 10)
+        • mean duration: 19.266 ms (1000 iterations)
+
+    • size: 100
+      • bench: Add item to the front of a list (size = 100)
+        • mean duration: 0.0 ms (1000 iterations)
+
+      • bench: Add item to the end of a list (size = 100)
+        • mean duration: 19.32 ms (1000 iterations)
 ```

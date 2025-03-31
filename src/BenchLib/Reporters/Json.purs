@@ -1,4 +1,4 @@
-module Test.BenchLib.Reporters.Json
+module BenchLib.Reporters.Json
   ( Opts
   , codecSuiteResults
   , reportJson
@@ -19,7 +19,7 @@ import Effect.Class.Console as Console
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (writeTextFile)
 import Node.Path (FilePath)
-import Test.BenchLib (GroupResults, defaultReporter, Reporter, SuiteResults, BenchResult)
+import BenchLib (GroupResults, defaultReporter, Reporter, SuiteResults, BenchResult)
 
 type Opts =
   { filePath :: FilePath
