@@ -64,7 +64,7 @@ defaultOpts =
 
 writeHtml :: Opts -> SuiteResults -> Effect Unit
 writeHtml opts suiteResults = do
-  template <- FS.readTextFile UTF8 "test/Test/BenchLib/Reporters/template.html"
+  template <- FS.readTextFile UTF8 "src/BenchLib/Reporters/template.html"
 
   let
     config =
