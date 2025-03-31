@@ -20,44 +20,38 @@ main = do
     benchSuite
       "Simple Example"
 
-      -- set benchmark suite options by overriding the default config:
+      -- set suite options by overriding default config:
       ( \cfg -> cfg
-          { -- Define different reporters depending on your needs:
-            reporters =
-              [ reportConsole -- Logs benchmarks to the console
-              , reportJson_ -- Writes benchmarks as JSON to a file
-              , reportChartJs_ -- Writes benchmarks as HTML with Chart.js for visualization
-              ]
+          { iterations = 1000 -- number of iterations each benchmark will run
+          , sizes = [ 20_000, 40_000, 80_000 ] -- input sizes to be passed to benchmark prepare functions
 
-          ,
-            -- Sets the number of iterations each benchmark will run:
-            iterations = 1000
-          ,
-            -- Sets input sizes to be passed to the benchmark functions:
-            sizes = [ 20_000, 40_000, 80_000 ]
+          -- different reporters depending on your needs:
+          , reporters =
+              [ reportConsole -- Simply logs benchmarks to the console
+              , reportJson_ -- Writes benchmarks as JSON to a file
+              , reportChartJs_ -- Writes benchmarks to a HTML file. Uses Chart.js for visualization.
+              ]
           }
       )
-      [
-        -- groups benchmarks to be compared:
-        benchGroup_ "List operations"
+      [ benchGroup_ "List operations"
           [ bench
               "Add item to the front of a list"
-              -- set benchmark options by overriding the default config:
+              -- set benchmark options:
               ( \cfg -> cfg
                   { prepare = \size -> mkItems size -- runs before each benchmark function
                   }
               )
-              -- the benchmark function:
+              -- benchmark function:
               (\items -> List.Cons 0 items)
 
           , bench
               "Add item to the end of a list"
-              -- set benchmark options by overriding the default config:
+              -- set benchmark options:
               ( \cfg -> cfg
                   { prepare = \size -> mkItems size -- runs before each benchmark function
                   }
               )
-              -- the benchmark function:
+              -- benchmark function:
               (\items -> List.snoc items 0)
           ]
       ]

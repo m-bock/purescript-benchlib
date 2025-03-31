@@ -24,7 +24,6 @@ import Effect (Effect)
 
 
 ```purescript
-
 main :: Effect Unit
 main = do
   let
@@ -35,47 +34,42 @@ main = do
     benchSuite
       "Simple Example"
 
-      -- set benchmark suite options by overriding the default config:
+      -- set suite options by overriding default config:
       ( \cfg -> cfg
-          { -- Define different reporters depending on your needs:
-            reporters =
-              [ reportConsole -- Logs benchmarks to the console
-              , reportJson_ -- Writes benchmarks as JSON to a file
-              , reportChartJs_ -- Writes benchmarks as HTML with Chart.js for visualization
-              ]
+          { iterations = 1000 -- number of iterations each benchmark will run
+          , sizes = [ 20_000, 40_000, 80_000 ] -- input sizes to be passed to benchmark prepare functions
 
-          ,
-            -- Sets the number of iterations each benchmark will run:
-            iterations = 1000
-          ,
-            -- Sets input sizes to be passed to the benchmark functions:
-            sizes = [ 20_000, 40_000, 80_000 ]
+          -- different reporters depending on your needs:
+          , reporters =
+              [ reportConsole -- Simply logs benchmarks to the console
+              , reportJson_ -- Writes benchmarks as JSON to a file
+              , reportChartJs_ -- Writes benchmarks to a HTML file. Uses Chart.js for visualization.
+              ]
           }
       )
-      [
-        -- groups benchmarks to be compared:
-        benchGroup_ "List operations"
+      [ benchGroup_ "List operations"
           [ bench
               "Add item to the front of a list"
-              -- set benchmark options by overriding the default config:
+              -- set benchmark options:
               ( \cfg -> cfg
                   { prepare = \size -> mkItems size -- runs before each benchmark function
                   }
               )
-              -- the benchmark function:
+              -- benchmark function:
               (\items -> List.Cons 0 items)
 
           , bench
               "Add item to the end of a list"
-              -- set benchmark options by overriding the default config:
+              -- set benchmark options:
               ( \cfg -> cfg
                   { prepare = \size -> mkItems size -- runs before each benchmark function
                   }
               )
-              -- the benchmark function:
+              -- benchmark function:
               (\items -> List.snoc items 0)
           ]
       ]
+
 ```
 
 Run the benchmarks in a terminal
@@ -89,26 +83,29 @@ The result will look like:
 ```bash
 • suite: Simple Example
   • group: List operations
-    • size: 0
-      • bench: Add item to the front of a list (size = 0)
-        • mean duration: 0.001 ms (1000 iterations)
-
-      • bench: Add item to the end of a list (size = 0)
-        • mean duration: 19.4 ms (1000 iterations)
-
-    • size: 10
-      • bench: Add item to the front of a list (size = 10)
-        • mean duration: 0.001 ms (1000 iterations)
-
-      • bench: Add item to the end of a list (size = 10)
-        • mean duration: 19.266 ms (1000 iterations)
-
-    • size: 100
-      • bench: Add item to the front of a list (size = 100)
+    • size: 20000
+      • bench: Add item to the front of a list (size = 20000)
         • mean duration: 0.0 ms (1000 iterations)
 
-      • bench: Add item to the end of a list (size = 100)
-        • mean duration: 19.32 ms (1000 iterations)
+      • bench: Add item to the end of a list (size = 20000)
+        • mean duration: 1.833 ms (1000 iterations)
+
+    • size: 40000
+      • bench: Add item to the front of a list (size = 40000)
+        • mean duration: 0.005 ms (1000 iterations)
+
+      • bench: Add item to the end of a list (size = 40000)
+        • mean duration: 4.731 ms (1000 iterations)
+
+    • size: 80000
+      • bench: Add item to the front of a list (size = 80000)
+        • mean duration: 0.001 ms (1000 iterations)
+
+      • bench: Add item to the end of a list (size = 80000)
+        • mean duration: 14.255 ms (1000 iterations)
+
+Wrote JSON report to bench-results.json
+Wrote HTML report to bench-results.html
 ```
 
 The visualization will look like:

@@ -95,7 +95,7 @@ reportChartJs mkOpts =
     defaultReporter
       { onSuiteFinish = \suiteResults -> do
           writeHtml opts suiteResults
-          Console.error ("Wrote ChartJS report to " <> opts.filePath)
+          Console.error ("Wrote HTML report to " <> opts.filePath)
       }
 
 reportChartJs_ :: Reporter

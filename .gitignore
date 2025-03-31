@@ -8,3 +8,5 @@
 /.purs*
 /.psa*
 /.spago
+/bench-results.html
+/bench-results.json
