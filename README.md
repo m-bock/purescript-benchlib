@@ -1,8 +1,33 @@
 # purescript-benchlib
 
-![logo](docs/logo.svg)
+![logo](docs/logo.png)
+
+A simple and flexible benchmarking library for PureScript, designed to help you measure performance with ease. 
+
+## Features
+
+- __Customizable Output__ – Choose between console logging, JSON reports, or HTML summaries with rendered charts.
+
+- __Flexible Benchmarking__ – Configure iterations, input sizes, and setup functions.
+
+- __Supports Pure & Effectful Functions__ – Benchmark any kind of computation.
+
+- __Pure PureScript__ – No JavaScript libraries under the hood, ensuring full type safety.
+
+<br>
+
+Focus on writing benchmarks, not boilerplate. 
+
+## Limitations
+
+- Currently, the library only supports Node.js. However, we plan to add browser support in the future.
+
+- The library is still in its early stages, and we welcome contributions to improve it.
+
 
 ## Minimal Example
+
+### 1 . Define Benchmarks in PureScript
 <details>
   <summary>Expand to see module header and imports</summary>
 
@@ -65,11 +90,17 @@ main = BenchLib.run $
     ]
 ```
 
-Run the benchmarks in a terminal
+### 2. Run the benchmarks from terminal
+
+After defining your benchmarks, you can run them from the terminal using `spago`:
 
 ```bash
 spago run -m Test.Samples.Simple
 ```
+
+### 3. Results
+
+#### Console Output
 
 The result console output will look like:
 
@@ -101,8 +132,14 @@ Wrote JSON report to bench-results.json
 Wrote HTML report to bench-results.html
 ```
 
+####  HTML Output
+
 The HTML report in `bench-results.html` will look like:
 
 ![ChartJs output](docs/screenshot-simple-results.png)
 
 It clearly demonstrates that List.Cons operates in constant time (O(1)), whereas List.snoc requires linear time (O(n)).
+
+#### JSON Output
+
+If you need custom postprocessing, you can use the JSON report in `bench-results.json`.
