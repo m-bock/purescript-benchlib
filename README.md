@@ -25,7 +25,7 @@ Focus on writing benchmarks, not boilerplate.
 - The library is still in its early stages, and we welcome contributions to improve it.
 
 
-## Minimal Example
+## Example to Get You Started
 
 ### 1 . Define Benchmarks in PureScript
 <details>
