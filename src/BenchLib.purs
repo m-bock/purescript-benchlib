@@ -32,6 +32,8 @@ module BenchLib
   , checkEq
   , class MonadBench
   , toAff
+  , class CanRunOnly
+  , only
   , defaultReporter
   , reportConsole
   , run
@@ -62,6 +64,7 @@ import Effect.Now (now)
 import Effect.Ref as Ref
 import Record as R
 import Safe.Coerce (coerce)
+import Prim.TypeError (class Warn, Text)
 
 --- Type Aliases
 
@@ -348,7 +351,19 @@ checkResults groupOpts results_ =
   where
   results = map (\({ benchName, output }) -> { benchName, output: show output }) results_
 
---- MonadBench
+--- Typeclasses
+
+-- | A combinator for entities that can be run only once.
+-- | This is useful while debugging or developing benchmarks.
+-- | So you do not have to run the whole suite again and again.
+class CanRunOnly a where
+  only :: Warn (Text "`only` usage") => a -> a
+
+instance CanRunOnly (Bench a) where
+  only (Bench mayOnly) = Bench (mayOnly { only = true })
+
+instance CanRunOnly Group where
+  only (Group mayOnly) = Group (mayOnly { only = true })
 
 -- | A class for monadic benchmarks.
 -- | It allows to run benchmarks in different monads as long as they are capable of
