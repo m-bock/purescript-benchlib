@@ -33,6 +33,7 @@ main = BenchLib.run $
             -- set benchmark options:
             ( \cfg -> cfg
                 { prepare = \size -> List.range 1 size -- runs before each benchmark
+                , overrideIterations = 900
                 }
             )
             -- benchmark function:
