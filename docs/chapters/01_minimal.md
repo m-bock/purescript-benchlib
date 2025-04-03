@@ -54,25 +54,29 @@ In the `main` function, we define a benchmark suite with a single group and two 
 
 ### Run the benchmark from Command Line
 
+After defining the benchmark, you can run it from the command line using the `spago` command. The `--main` flag specifies the module containing the `main` function.
+
 <!-- start:run
 {"cmd": "npx spago run --main Test.Samples.Minimal"}
 -->
-> ```bash
-> npx spago run --main Test.Samples.Minimal
-> ```
+```bash
+npx spago run --main Test.Samples.Minimal
+```
 
-> ```text
-> • suite: Minimal Example
->   • group: range functions
->     • bench: Array
->       • size=0, duration=0.0080ms, iterations=1000
->       • size=25000, duration=0.1620ms, iterations=1000
->       • size=50000, duration=0.2980ms, iterations=1000
->       • size=100000, duration=0.5190ms, iterations=1000
->     • bench: Lazy List
->       • size=0, duration=0.0010ms, iterations=1000
->       • size=25000, duration=0.0030ms, iterations=1000
->       • size=50000, duration=0.0030ms, iterations=1000
->       • size=100000, duration=0.0000ms, iterations=1000
-> ```
+```text
+• suite: Minimal Example
+  • group: range functions
+    • bench: Array
+      • size=0, duration=0.0010ms, iterations=1000
+      • size=25000, duration=0.1630ms, iterations=1000
+      • size=50000, duration=0.2920ms, iterations=1000
+      • size=100000, duration=0.5200ms, iterations=1000
+    • bench: Lazy List
+      • size=0, duration=0.0020ms, iterations=1000
+      • size=25000, duration=0.0030ms, iterations=1000
+      • size=50000, duration=0.0030ms, iterations=1000
+      • size=100000, duration=0.0020ms, iterations=1000
+```
 <!-- end -->
+
+The results show what you might have already guessed: the `Array` implementation is significantly slower than the `Lazy List` implementation. The reason is obvious: The lazy list is not evaluated until it is needed, so it is much faster to create. 
