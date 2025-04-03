@@ -12,7 +12,7 @@
   "link": true
 }
 -->
-[Source Code: test/Test/Samples/Minimal.purs](test/Test/Samples/Minimal.purs)
+Source Code: [test/Test/Samples/Minimal.purs](test/Test/Samples/Minimal.purs)
 > ```purescript
 > module Test.Samples.Minimal where
 > 
@@ -57,22 +57,22 @@ In the `main` function, we define a benchmark suite with a single group and two 
 <!-- start:run
 {"cmd": "npx spago run --main Test.Samples.Minimal"}
 -->
-```bash
-npx spago run --main Test.Samples.Minimal
-```
+> ```bash
+> npx spago run --main Test.Samples.Minimal
+> ```
 
-```text
-• suite: Minimal Example
-  • group: range functions
-    • bench: Array
-      • size=0, duration=0.0050ms, iterations=1000
-      • size=25000, duration=0.1600ms, iterations=1000
-      • size=50000, duration=0.2880ms, iterations=1000
-      • size=100000, duration=0.5050ms, iterations=1000
-    • bench: Lazy List
-      • size=0, duration=0.0010ms, iterations=1000
-      • size=25000, duration=0.0020ms, iterations=1000
-      • size=50000, duration=0.0030ms, iterations=1000
-      • size=100000, duration=0.0000ms, iterations=1000
-```
+> ```text
+> • suite: Minimal Example
+>   • group: range functions
+>     • bench: Array
+>       • size=0, duration=0.0080ms, iterations=1000
+>       • size=25000, duration=0.1620ms, iterations=1000
+>       • size=50000, duration=0.2980ms, iterations=1000
+>       • size=100000, duration=0.5190ms, iterations=1000
+>     • bench: Lazy List
+>       • size=0, duration=0.0010ms, iterations=1000
+>       • size=25000, duration=0.0030ms, iterations=1000
+>       • size=50000, duration=0.0030ms, iterations=1000
+>       • size=100000, duration=0.0000ms, iterations=1000
+> ```
 <!-- end -->
