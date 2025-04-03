@@ -13,16 +13,16 @@
 }
 -->
 [Source Code: test/Test/Samples/Minimal.purs](test/Test/Samples/Minimal.purs)
-```purescript
-module Test.Samples.Minimal where
-
-import Prelude
-import BenchLib (benchGroup_, benchSuite_, bench_)
-import BenchLib as BenchLib
-import Data.Array as Array
-import Data.List.Lazy as LazyList
-import Effect (Effect)
-```
+> ```purescript
+> module Test.Samples.Minimal where
+> 
+> import Prelude
+> import BenchLib (benchGroup_, benchSuite_, bench_)
+> import BenchLib as BenchLib
+> import Data.Array as Array
+> import Data.List.Lazy as LazyList
+> import Effect (Effect)
+> ```
 <!-- end -->
 
 
