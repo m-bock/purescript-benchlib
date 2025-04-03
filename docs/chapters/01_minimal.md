@@ -33,22 +33,22 @@ In the `main` function, we define a benchmark suite with a single group and two 
 {"file": "test/Test/Samples/Minimal.purs", "section": "Main"}
 -->
 
-```purescript
-main :: Effect Unit
-main = BenchLib.run $
-  benchSuite_
-    "Minimal Example"
-    [ benchGroup_ "range functions"
-        [ bench_
-            "Array"
-            (\size -> Array.replicate size 'x')
-
-        , bench_
-            "Lazy List"
-            (\size -> LazyList.replicate size 'x')
-        ]
-    ]
-```
+> ```purescript
+> main :: Effect Unit
+> main = BenchLib.run $
+>   benchSuite_
+>     "Minimal Example"
+>     [ benchGroup_ "range functions"
+>         [ bench_
+>             "Array"
+>             (\size -> Array.replicate size 'x')
+> 
+>         , bench_
+>             "Lazy List"
+>             (\size -> LazyList.replicate size 'x')
+>         ]
+>     ]
+> ```
 <!-- end -->
 
 
