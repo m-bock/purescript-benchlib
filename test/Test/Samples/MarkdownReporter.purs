@@ -51,10 +51,10 @@ main = BenchLib.run $
     [ benchGroup_ "Replicate functions"
         [ bench_
             "Array"
-            (\size -> const unit $ Array.replicate size 'x')
+            (\size -> Array.replicate size 'x')
 
         , bench_
             "Lazy List"
-            (\size -> const unit $ LazyList.replicate size 'x')
+            (\size -> LazyList.replicate size 'x')
         ]
     ]

@@ -25,7 +25,10 @@ main = BenchLib.run $
             }
         )
         [ bench "Array"
-            (\cfg -> cfg)
+            ( \cfg -> cfg
+                { finalize = identity
+                }
+            )
             (\size -> Array.replicate size 'x')
 
         , bench "Lazy List"
