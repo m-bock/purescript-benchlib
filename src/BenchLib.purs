@@ -47,7 +47,6 @@ import Control.Monad.Error.Class (throwError)
 import Data.Array (filter)
 import Data.Array as Array
 import Data.DateTime.Instant (unInstant)
-import Data.Exists (Exists)
 import Data.Int as Int
 import Data.List as List
 import Data.List.NonEmpty as NEL
@@ -88,16 +87,14 @@ type SuiteOpts =
 
 -- | Options for the benchmark group.
 type GroupOpts out =
-  { overrideSizes :: Array Int
-  , overrideIterations :: Int
-  , overrideReporters :: Array Reporter
+  { sizes :: Array Int
+  , iterations :: Int
   , checkOutputs :: Maybe ({ outputs :: Array out, size :: Size } -> Boolean)
   }
 
 -- | Options for monadic benchmarks.
 type BenchOptsM (m :: Type -> Type) input result output =
   { overrideIterations :: Int
-  , overrideReporters :: Array Reporter
   , prepare :: Size -> m input
   , finalize :: result -> m output
   }
@@ -105,7 +102,6 @@ type BenchOptsM (m :: Type -> Type) input result output =
 -- | Options for pure benchmarks.
 type BenchOptsPure input result output =
   { overrideIterations :: Int
-  , overrideReporters :: Array Reporter
   , prepare :: Size -> input
   , finalize :: result -> output
   }
@@ -148,7 +144,13 @@ newtype Suite = Suite
 newtype Group = Group
   ( MayOnly
       { groupName :: String
-      , run :: GroupOpts Unit -> Aff GroupResults
+      , run ::
+          { reporters :: Array Reporter
+          , iterations :: Int
+          , sizes :: Array Int
+          , checkOutputs :: Maybe ({ outputs :: Array Unit, size :: Size } -> Boolean)
+          }
+          -> Aff GroupResults
       }
   )
 
@@ -156,7 +158,7 @@ newtype Group = Group
 newtype Bench out = Bench
   ( MayOnly
       { benchName :: String
-      , run :: { size :: Size, iterations :: Int } -> Aff (SampleResult /\ out)
+      , run :: { size :: Size, iterations :: Int, reporters :: Array Reporter } -> Aff (SampleResult /\ out)
       }
   )
 
@@ -226,17 +228,15 @@ defaultSuiteOpts =
   }
 
 mkDefaultGroupOpts :: forall a. SuiteOpts -> GroupOpts a
-mkDefaultGroupOpts { sizes, iterations, reporters } =
-  { overrideSizes: sizes
-  , overrideIterations: iterations
-  , overrideReporters: reporters
+mkDefaultGroupOpts { sizes, iterations } =
+  { sizes
+  , iterations
   , checkOutputs: Nothing
   }
 
 mkDefaultBenchOpts :: forall out. GroupOpts out -> BenchOptsPure Size out out
-mkDefaultBenchOpts { overrideIterations, overrideReporters } =
-  { overrideIterations
-  , overrideReporters
+mkDefaultBenchOpts { iterations } =
+  { overrideIterations: iterations
   , prepare: identity
   , finalize: identity
   }
@@ -244,7 +244,6 @@ mkDefaultBenchOpts { overrideIterations, overrideReporters } =
 defaultBenchOpts :: forall ret. BenchOptsPure Size ret Unit
 defaultBenchOpts =
   { overrideIterations: 0
-  , overrideReporters: []
   , prepare: identity
   , finalize: const unit
   }
@@ -265,7 +264,12 @@ benchSuite suiteName mkOpts groups_ = Suite
       runReporters opts.reporters \rep -> rep.onSuiteStart suiteName
 
       groupResults <- for groups \group -> do
-        group.run (mkDefaultGroupOpts opts)
+        group.run
+          { reporters: opts.reporters
+          , iterations: opts.iterations
+          , sizes: opts.sizes
+          , checkOutputs: Nothing
+          }
 
       let results = { suiteName, groups: groupResults }
 
@@ -308,11 +312,16 @@ f = do
 benchGroup :: forall @out. Eq out => Show out => String -> (GroupOpts Unit -> GroupOpts out) -> Array (Bench out) -> Group
 benchGroup groupName mkOpts benches_ = Group $ notOnly
   { groupName
-  , run: \defOpts -> do
+  , run: \defOpts@{ reporters } -> do
 
-      let groupOpts = mkOpts defOpts
+      let
+        groupOpts = mkOpts
+          { sizes: defOpts.sizes
+          , iterations: defOpts.iterations
+          , checkOutputs: Nothing
+          }
 
-      runReporters groupOpts.overrideReporters \rep -> rep.onGroupStart groupName
+      runReporters reporters \rep -> rep.onGroupStart groupName
 
       let benches = mayGetOnlies $ map (\(Bench b) -> b) benches_
 
@@ -321,18 +330,19 @@ benchGroup groupName mkOpts benches_ = Group $ notOnly
       itf <- liftEffect f
 
       results <- for benches \bench -> do
-        runReporters groupOpts.overrideReporters \rep -> rep.onBenchStart bench.benchName
-        r <- for groupOpts.overrideSizes \size -> do
-          runReporters groupOpts.overrideReporters \rep -> rep.onSizeStart size
+        runReporters reporters \rep -> rep.onBenchStart bench.benchName
+        r <- for groupOpts.sizes \size -> do
+          runReporters reporters \rep -> rep.onSizeStart size
 
           let benchOpts = mkDefaultBenchOpts groupOpts
 
           { duration, iterations } /\ output <- bench.run
             { size
-            , iterations: groupOpts.overrideIterations
+            , iterations: groupOpts.iterations
+            , reporters
             }
 
-          runReporters groupOpts.overrideReporters \rep -> rep.onSizeFinish { size, duration, iterations }
+          runReporters reporters \rep -> rep.onSizeFinish { size, duration, iterations }
 
           liftEffect $ itf.add size { benchName: bench.benchName, output }
 
@@ -343,9 +353,9 @@ benchGroup groupName mkOpts benches_ = Group $ notOnly
       let groupResults = { groupName, benchs: results }
 
       outs <- liftEffect itf.get
-      for_ outs $ checkResults groupOpts
+      for_ outs $ checkResults groupOpts reporters
 
-      runReporters groupOpts.overrideReporters \rep -> rep.onGroupFinish groupResults
+      runReporters reporters \rep -> rep.onGroupFinish groupResults
 
       pure groupResults
   }
@@ -387,18 +397,18 @@ benchImpl benchName mkOpts benchFn = Bench $ notOnly
 
 type ResultPerSize out = { outputs :: Array { output :: out, benchName :: String }, size :: Size }
 
-checkResults :: forall out. Show out => Eq out => GroupOpts out -> ResultPerSize out -> Aff Unit
-checkResults groupOpts all@{ size } =
+checkResults :: forall out. Show out => Eq out => GroupOpts out -> Array Reporter -> ResultPerSize out -> Aff Unit
+checkResults groupOpts reporters all@{ size } =
   for_ groupOpts.checkOutputs \check -> do
 
     if check { size, outputs: map _.output all.outputs } then do
-      runReporters groupOpts.overrideReporters \rep -> rep.onCheckResults
+      runReporters reporters \rep -> rep.onCheckResults
         { success: true
         , size
         , outputs
         }
     else do
-      runReporters groupOpts.overrideReporters \rep -> rep.onCheckResults
+      runReporters reporters \rep -> rep.onCheckResults
         { success: false
         , size
         , outputs
@@ -470,9 +480,8 @@ runReporters :: Array Reporter -> (Reporter -> Effect Unit) -> Aff Unit
 runReporters reporters f = liftEffect $ for_ reporters f
 
 benchOptsPureToAff :: forall @m inp ret out. Applicative m => BenchOptsPure inp ret out -> BenchOptsM m inp ret out
-benchOptsPureToAff { overrideIterations, overrideReporters, prepare, finalize } =
+benchOptsPureToAff { overrideIterations, prepare, finalize } =
   { overrideIterations
-  , overrideReporters
   , prepare: \size -> pure $ prepare size
   , finalize: \result -> pure $ finalize result
   }
