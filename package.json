@@ -13,6 +13,7 @@
   "devDependencies": {
     "purescript": "^0.15.15",
     "purs-tidy": "^0.11.0",
+    "purs-to-md": "^0.3.0",
     "spago": "^0.93.43"
   }
 }

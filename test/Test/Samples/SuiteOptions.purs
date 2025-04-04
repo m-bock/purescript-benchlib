@@ -29,11 +29,11 @@ main = BenchLib.run $
     [ benchGroup_ "range functions"
         [ bench_
             "Create a range of numbers in an array"
-            (\size -> Array.range 0 size)
+            (\size -> const unit $ Array.range 0 size)
 
         , bench_
             "Create a range of numbers in a list"
-            (\size -> List.range 0 size)
+            (\size -> const unit $ List.range 0 size)
         ]
     ]
 

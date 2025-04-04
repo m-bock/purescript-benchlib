@@ -1,6 +1,7 @@
 package:
   name: benchlib
   dependencies:
+    - exists
     - aff: ">=8.0.0 <9.0.0"
     - argonaut: ">=9.0.0 <10.0.0"
     - arrays: ">=7.3.0 <8.0.0"
@@ -34,6 +35,7 @@ package:
       - console
       - effect
       - spec
+      - node-process
   publish:
     version: 0.0.2
     license: BSD-3-Clause

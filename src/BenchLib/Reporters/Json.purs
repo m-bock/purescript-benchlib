@@ -3,11 +3,11 @@ module BenchLib.Reporters.Json
   , codecSuiteResults
   , reportJson
   , reportJson_
-  )
-  where
+  ) where
 
 import Prelude
 
+import BenchLib (BenchResult, GroupResults, Reporter, SuiteResults, SampleResult, defaultReporter)
 import Data.Argonaut (stringifyWithIndent)
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
@@ -19,14 +19,17 @@ import Effect.Class.Console as Console
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (writeTextFile)
 import Node.Path (FilePath)
-import BenchLib (GroupResults, defaultReporter, Reporter, SuiteResults, BenchResult)
 
 type Opts =
   { filePath :: FilePath
+  , indent :: Int
   }
 
 defaultOpts :: Opts
-defaultOpts = { filePath: "bench-results.json" }
+defaultOpts =
+  { filePath: "bench-results.json"
+  , indent: 2
+  }
 
 reportJson_ :: Reporter
 reportJson_ = reportJson identity
@@ -38,12 +41,12 @@ reportJson mkOpts =
   in
     defaultReporter
       { onSuiteFinish = \suiteResults -> do
-          writeTextFile UTF8 opts.filePath $ toJsonStr suiteResults
+          writeTextFile UTF8 opts.filePath $ toJsonStr opts.indent suiteResults
           Console.error ("Wrote JSON report to " <> opts.filePath)
       }
 
-toJsonStr :: SuiteResults -> String
-toJsonStr = stringifyWithIndent 2 <<< CA.encode codecSuiteResults
+toJsonStr :: Int -> SuiteResults -> String
+toJsonStr indent = stringifyWithIndent indent <<< CA.encode codecSuiteResults
 
 --- Codecs ---
 
@@ -62,7 +65,12 @@ codecGroupResults = CAR.object "GroupResults"
 codecBenchResult :: JsonCodec BenchResult
 codecBenchResult = CAR.object "BenchResult"
   { benchName: CA.string
-  , size: CA.int
+  , samples: CA.array codecSampleResult
+  }
+
+codecSampleResult :: JsonCodec SampleResult
+codecSampleResult = CAR.object "SampleResult"
+  { size: CA.int
   , duration: codecMilliseconds
   , iterations: CA.int
   }

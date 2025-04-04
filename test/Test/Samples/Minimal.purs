@@ -1,25 +1,28 @@
+--- Header
+
 module Test.Samples.Minimal where
 
 import Prelude
-
 import BenchLib (benchGroup_, benchSuite_, bench_)
 import BenchLib as BenchLib
 import Data.Array as Array
-import Data.List as List
+import Data.List.Lazy as LazyList
 import Effect (Effect)
+
+--- Main
 
 main :: Effect Unit
 main = BenchLib.run $
   benchSuite_
     "Minimal Example"
-    [ benchGroup_ "range functions"
+    [ benchGroup_ "Replicate Functions"
         [ bench_
-            "Create a range of numbers in an array"
-            (\size -> Array.range 0 size)
+            "Array"
+            (\size -> const unit $ Array.replicate size 'x')
 
         , bench_
-            "Create a range of numbers in a list"
-            (\size -> List.range 0 size)
+            "Lazy List"
+            (\size -> const unit $ LazyList.replicate size 'x')
         ]
     ]
 

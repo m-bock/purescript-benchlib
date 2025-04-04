@@ -37,7 +37,7 @@ main = BenchLib.run $
                 }
             )
             -- benchmark function:
-            (\items -> List.Cons 0 items)
+            (\items -> const unit $  List.Cons 0 items)
 
         , bench
             "Add item to the end of a list"
@@ -47,7 +47,6 @@ main = BenchLib.run $
                 }
             )
             -- benchmark function:
-            (\items -> List.snoc items 0)
+            (\items -> const unit $ List.snoc items 0)
         ]
     ]
-

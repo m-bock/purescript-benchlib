@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minimal Example</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+      h1 {
+        margin: 0;
+        padding: 0;
+        padding-bottom: 20px;
+      }
+      h2 {
+        margin: 0;
+        padding: 0;
+        padding-bottom: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <script>
+      /* config start */
+      const config = {
+        "data": {
+          "groups": [
+            {
+              "benchs": [
+                {
+                  "benchName": "Array",
+                  "samples": [
+                    {
+                      "duration": 0.002,
+                      "iterations": 1000,
+                      "size": 0
+                    },
+                    {
+                      "duration": 0.153,
+                      "iterations": 1000,
+                      "size": 20000
+                    },
+                    {
+                      "duration": 0.342,
+                      "iterations": 1000,
+                      "size": 40000
+                    },
+                    {
+                      "duration": 0.583,
+                      "iterations": 1000,
+                      "size": 80000
+                    }
+                  ]
+                },
+                {
+                  "benchName": "Lazy List",
+                  "samples": [
+                    {
+                      "duration": 0.002,
+                      "iterations": 1000,
+                      "size": 0
+                    },
+                    {
+                      "duration": 0.001,
+                      "iterations": 1000,
+                      "size": 20000
+                    },
+                    {
+                      "duration": 0,
+                      "iterations": 1000,
+                      "size": 40000
+                    },
+                    {
+                      "duration": 0.001,
+                      "iterations": 1000,
+                      "size": 80000
+                    }
+                  ]
+                }
+              ],
+              "groupName": "Replicate functions"
+            }
+          ],
+          "suiteName": "Minimal Example"
+        },
+        "lineStyles": [
+          {
+            "color": {
+              "b": 132,
+              "g": 99,
+              "r": 255
+            },
+            "opacity": 0.5,
+            "width": 2
+          },
+          {
+            "color": {
+              "b": 235,
+              "g": 162,
+              "r": 54
+            },
+            "opacity": 0.5,
+            "width": 2
+          },
+          {
+            "color": {
+              "b": 255,
+              "g": 102,
+              "r": 153
+            },
+            "opacity": 0.5,
+            "width": 2
+          }
+        ]
+      }
+      /* config end */
+
+      function renderCharts(dataConfig) {
+        const container = document.createElement("div");
+        container.style.maxWidth = "600px";
+        container.style.margin = "0 auto";
+        container.style.padding = "20px";
+
+        const header = document.createElement("h1");
+        header.textContent = dataConfig.suiteName;
+        container.appendChild(header);
+
+        document.body.appendChild(container);
+
+        dataConfig.groups.forEach((group, groupIndex) => {
+          const chartContainer = document.createElement("div");
+          chartContainer.style.marginBottom = "40px";
+
+          const title = document.createElement("h2");
+          title.textContent = group.groupName;
+          chartContainer.appendChild(title);
+
+          const canvas = document.createElement("canvas");
+          canvas.id = `chart-${groupIndex}`;
+          chartContainer.appendChild(canvas);
+
+          container.appendChild(chartContainer);
+
+          const labels = [...new Set(group.benchs.map((bench) => bench.size))];
+
+          const datasets = Object.values(
+            group.benchs.reduce((acc, bench, index) => {
+              if (!acc[bench.benchName]) {
+                const style =
+                  config.lineStyles[index % config.lineStyles.length];
+                const rgbaColor = `rgba(${style.color.r}, ${style.color.g}, ${style.color.b}, ${style.opacity})`;
+
+                acc[bench.benchName] = {
+                  label: bench.benchName,
+                  data: [],
+                  borderColor: rgbaColor,
+                  borderWidth: style.width,
+                  backgroundColor: rgbaColor,
+                  fill: false,
+                  tension: 0.1,
+                };
+              }
+              acc[bench.benchName].data.push(bench.duration);
+              return acc;
+            }, {})
+          );
+
+          new Chart(canvas.getContext("2d"), {
+            type: "line",
+            data: {
+              labels: labels,
+              datasets: datasets,
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: {
+                  display: true,
+                },
+              },
+              scales: {
+                x: {
+                  type: "linear",
+                  title: {
+                    display: true,
+                    text: "Input Size",
+                  },
+                },
+                y: {
+                  max: (ctx) => {
+                    const maxValue = Math.max(
+                      ...ctx.chart.data.datasets.flatMap((ds) => ds.data)
+                    );
+                    return Math.max(maxValue, 10);
+                  },
+                  title: {
+                    display: true,
+
+                    text: "Average Time (ms)",
+                  },
+                },
+              },
+            },
+          });
+        });
+      }
+
+      renderCharts(config.data);
+    </script>
+  </body>
+</html>

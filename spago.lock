@@ -26,6 +26,7 @@
             {
               "effect": ">=4.0.0 <5.0.0"
             },
+            "exists",
             {
               "foldable-traversable": ">=6.0.0 <7.0.0"
             },
@@ -155,11 +156,13 @@
           "dependencies": [
             "console",
             "effect",
+            "node-process",
             "spec"
           ],
           "build_plan": [
             "aff",
             "ansi",
+            "arraybuffer-types",
             "arrays",
             "avar",
             "bifunctors",
@@ -176,6 +179,8 @@
             "exceptions",
             "exists",
             "foldable-traversable",
+            "foreign",
+            "foreign-object",
             "fork",
             "free",
             "functions",
@@ -189,14 +194,20 @@
             "maybe",
             "mmorph",
             "newtype",
+            "node-buffer",
+            "node-event-emitter",
+            "node-process",
+            "node-streams",
             "nonempty",
             "now",
+            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
             "parallel",
             "partial",
             "pipes",
+            "posix-types",
             "prelude",
             "profunctor",
             "refs",
@@ -208,6 +219,7 @@
             "transformers",
             "tuples",
             "type-equality",
+            "typelevel-prelude",
             "unfoldable",
             "unsafe-coerce"
           ]
@@ -1344,6 +1356,22 @@
         "effect"
       ]
     },
+    "node-process": {
+      "type": "registry",
+      "version": "11.2.0",
+      "integrity": "sha256-+2MQDYChjGbVbapCyJtuWYwD41jk+BntF/kcOTKBMVs=",
+      "dependencies": [
+        "effect",
+        "foreign",
+        "foreign-object",
+        "maybe",
+        "node-event-emitter",
+        "node-streams",
+        "posix-types",
+        "prelude",
+        "unsafe-coerce"
+      ]
+    },
     "node-streams": {
       "type": "registry",
       "version": "9.0.1",
@@ -1469,6 +1497,15 @@
         "tailrec",
         "transformers",
         "tuples"
+      ]
+    },
+    "posix-types": {
+      "type": "registry",
+      "version": "6.0.0",
+      "integrity": "sha256-ZfFz8RR1lee/o/Prccyeut3Q+9tYd08mlR72sIh6GzA=",
+      "dependencies": [
+        "maybe",
+        "prelude"
       ]
     },
     "prelude": {
