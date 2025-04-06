@@ -14,41 +14,45 @@
 module BenchLib
   ( SuiteOpts
   , Size
-  --   Bench
-  -- , Group
-  -- , Suite
-  -- , BenchResult
+  , Bench
+  , Group
+  , Suite
+  , BenchResult
   -- , SampleResult
-  -- , GroupResults
-  -- , SuiteResults
-  -- , CheckResults
-  -- , Reporter
+  , GroupResult
+  , SuiteResult
+  , CheckResults
+  , Stats
+  , Reporter
   -- , Size
-  -- , benchSuite
-  -- , benchGroup
-  -- , bench
-  -- , benchM
-  -- , benchSuite_
-  -- , benchGroup_
-  -- , bench_
-  -- , benchM_
-  -- , checkEq
-  -- , class MonadBench
-  -- , toAff
+  , benchSuite
+  , benchGroup
+  , bench
+  , benchM
+  , benchSuite_
+  , benchGroup_
+  , benchM_
+  , bench_
+  , checkEq
+  , class MonadBench
+  , toAff
   -- , class CanRunOnly
   -- , only
-  -- , defaultReporter
-  -- , reportConsole
-  -- , run
+  , defaultReporter
+  , reportConsole
+  , run
   -- , eval
   ) where
 
 import Prelude
 
 import Control.Monad.Error.Class (throwError)
-import Data.Array (filter)
+import Data.Array (filter, foldr)
 import Data.Array as Array
+import Data.Bifunctor (class Bifunctor, lmap)
 import Data.DateTime.Instant (unInstant)
+import Data.Foldable (fold)
+import Data.Function (on)
 import Data.Int as Int
 import Data.List as List
 import Data.List.NonEmpty as NEL
@@ -57,8 +61,11 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Number (pow)
+import Data.Number as Number
 import Data.Number.Format as NumFmt
 import Data.Profunctor (class Profunctor, dimap)
+import Data.Semigroup.Foldable (maximum, minimum)
 import Data.String as Str
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, for_, sum)
@@ -73,6 +80,7 @@ import Effect.Class.Console as Console
 import Effect.Now (now)
 import Effect.Ref as Ref
 import Prim.TypeError (class Warn, Text)
+import Record as Record
 import Safe.Coerce (coerce)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -86,7 +94,7 @@ type Size = Int
 type SuiteOpts =
   { sizes :: Array Size
   , iterations :: Int
-  --, reporters :: Array Reporter
+  , reporters :: Array Reporter
   }
 
 -- | Options for the benchmark group.
@@ -98,34 +106,27 @@ type GroupOpts a b =
   }
 
 -- | Options for benchmarks.
-type BenchOpts =
-  { overrideIterations :: Int
+type BenchOpts a =
+  { iterations :: Int
+  , prepareInput :: Size -> a
   }
-
 
 --- Result Types
 
 -- | The result of a benchmark suite.
-type SuiteResults =
-  { suiteName :: String
-  , groups :: Array GroupResults
+type SuiteResult =
+  { groupResults :: Array GroupResult
+  --, suiteName :: String
   }
 
 -- | The result of a benchmark group.
-type GroupResults =
-  { groupName :: String
-  , benchs :: Array BenchResult
+type GroupResult =
+  { benchResults :: Array BenchResult
   }
 
 -- | The result of a benchmark.
 type BenchResult =
-  { benchName :: String
-  , samples :: Array SampleResult
-  }
-
-type SampleResult =
-  { duration :: Milliseconds
-  , iterations :: Int
+  { samples :: Array Stats
   }
 
 --- Opaque types
@@ -133,20 +134,19 @@ type SampleResult =
 -- | Opaque type for the benchmark suite.
 newtype Suite = Suite
   { suiteName :: String
-  , run :: SuiteOpts -> Aff SuiteResults
+  , runSuite :: SuiteOpts -> Aff { groupResults :: Array GroupResult }
   }
 
 -- | Opaque type for the benchmark group.
 newtype Group = Group
   ( MayOnly
       { groupName :: String
-      , run ::
-          { reporters :: Array Reporter
+      , runGroup ::
+          { reporter :: Reporter
           , iterations :: Int
           , sizes :: Array Int
-          , checkOutputs :: Maybe ({ outputs :: Array Unit, size :: Size } -> Boolean)
           }
-          -> Aff GroupResults
+          -> Aff { benchResults ∷ Array BenchResult }
       }
   )
 
@@ -154,31 +154,65 @@ newtype Group = Group
 newtype Bench a b = Bench
   ( MayOnly
       { benchName :: String
-      , run :: { iterations :: Int, reporters :: Array Reporter } -> a -> Aff (SampleResult /\ b)
+      , runBench ::
+          { iterations :: Int
+          , size :: Size
+          }
+          -> Aff { stats :: Stats, input :: a, output :: b }
       }
   )
 
-instance Profunctor Bench where
-  dimap f g (Bench mo) = Bench $ map
-    ( \rec -> rec
-        { run = \opts inp -> map (map g) $ rec.run opts (f inp) }
-    )
-    mo
+derive instance Functor (Bench a)
+
+instance Bifunctor Bench where
+  bimap f g (Bench mayOnly) = Bench $ mayOnly # map \rec -> rec
+    { runBench = \opts -> do
+        ret@{ input, output } <- rec.runBench opts
+        pure $ ret { input = f input, output = g output }
+    }
+
+mapInput :: forall a a' b. (a -> a') -> Bench a b -> Bench a' b
+mapInput = lmap
+
+mapOutput :: forall a b b'. (b -> b') -> Bench a b -> Bench a b'
+mapOutput = map
 
 --- Reporter types
 
 -- | A reporter is a set of functions that are called at different stages of the benchmark.
 -- | It allows to customize the output of the benchmark suite or perform other actions like writing to a file.
 type Reporter =
-  { onSuiteStart :: String -> Effect Unit
-  , onGroupStart :: String -> Effect Unit
-  , onSizeStart :: Size -> Effect Unit
-  , onBenchStart :: String -> Effect Unit
-  , onSuiteFinish :: SuiteResults -> Effect Unit
-  , onGroupFinish :: GroupResults -> Effect Unit
-  , onSizeFinish :: SampleResult -> Effect Unit
-  , onBenchFinish :: SampleResult -> Effect Unit
-  , onCheckResults :: CheckResults -> Effect Unit
+  { onSuiteStart :: String -> Aff Unit
+  , onGroupStart :: String -> Aff Unit
+  , onBenchStart :: String -> Aff Unit
+  , onSizeStart :: Size -> Aff Unit
+  , onSizeFinish :: Stats -> Aff Unit
+  , onBenchFinish :: Stats -> Aff Unit
+  , onGroupFinish :: GroupResult -> Aff Unit
+  , onSuiteFinish :: SuiteResult -> Aff Unit
+  }
+
+type R =
+  { onSuiteStart ::
+      String
+      -> Aff
+           { onGroupStart ::
+               String
+               -> Aff
+                    { onBenchStart ::
+                        String
+                        -> Aff
+                             { onSizeStart ::
+                                 Size
+                                 -> Aff
+                                      { onSizeFinish :: Stats -> Aff Unit
+                                      }
+                             , onBenchFinish :: Stats -> Aff Unit
+                             }
+                    , onGroupFinish :: GroupResult -> Aff Unit
+                    }
+           , onSuiteFinish :: SuiteResult -> Aff Unit
+           }
   }
 
 type CheckResults =
@@ -197,240 +231,241 @@ newtype MayOnly a = MayOnly { only :: Boolean, val :: a }
 
 derive instance Functor MayOnly
 
--- --- Running the benchmark suite
+setOnly :: forall a. Boolean -> MayOnly a -> MayOnly a
+setOnly b (MayOnly r) = MayOnly $ r { only = b }
 
--- -- | Run the benchmark suite.
--- run :: Suite -> Effect Unit
--- run suite = launchAff_ $ void $ eval suite
+--- Running the benchmark suite
 
--- -- | Evaluate the benchmark suite.
--- eval :: Suite -> Aff SuiteResults
--- eval (Suite suite) = suite.run defaultSuiteOpts
+-- | Run the benchmark suite.
+run :: Suite -> Effect Unit
+run suite = launchAff_ $ void $ eval suite
 
--- --- Exported utility functions
+-- | Evaluate the benchmark suite.
+eval :: Suite -> Aff SuiteResult
+eval (Suite suite) = suite.runSuite defaultSuiteOpts
 
--- -- | Check if all elements in the array are equal.
--- -- | Useful for checking the results of benchmarks.
--- checkEq :: forall a. Eq a => Array a -> Boolean
--- checkEq items =
---   let
---     first = Array.head items
+--- Exported utility functions
 
---     checkEq' :: a -> Boolean
---     checkEq' x = Array.all (_ == x) items
---   in
---     case first of
---       Just x -> checkEq' x
---       Nothing -> true
+-- | Check if all elements in the array are equal.
+-- | Useful for checking the results of benchmarks.
+checkEq :: forall a. Eq a => Array a -> Boolean
+checkEq items =
+  let
+    first = Array.head items
 
--- --- Defaults
+    checkEq' :: a -> Boolean
+    checkEq' x = Array.all (_ == x) items
+  in
+    case first of
+      Just x -> checkEq' x
+      Nothing -> true
 
--- defaultSuiteOpts :: SuiteOpts
--- defaultSuiteOpts =
---   { sizes: [ 0, 25_000, 50_000, 100_000 ]
---   , iterations: 1000
---   , reporters: [ reportConsole ]
---   }
+--- Defaults
 
--- -- mkDefaultGroupOpts :: forall a. SuiteOpts -> GroupOpts a
--- -- mkDefaultGroupOpts { sizes, iterations } =
--- --   { sizes
--- --   , iterations
--- --   , checkOutputs: Nothing
--- --   }
-
--- mkDefaultBenchOpts :: forall ninp out. GroupOpts ninp out -> BenchOptsPure Size Size out out
--- mkDefaultBenchOpts { iterations } =
---   { overrideIterations: iterations
---   , prepare: identity
---   , finalize: identity
---   }
-
-defaultBenchOpts :: BenchOpts
-defaultBenchOpts =
-  { overrideIterations: 0
+defaultSuiteOpts :: SuiteOpts
+defaultSuiteOpts =
+  { sizes: [ 0, 25_000, 50_000, 100_000 ]
+  , iterations: 1000
+  , reporters: [ reportConsole ]
   }
 
--- --- Core functions
+mkDefaultGroupOpts :: forall a b. { sizes :: Array Size, iterations :: Int } -> GroupOpts a b
+mkDefaultGroupOpts { sizes, iterations } =
+  { sizes
+  , iterations
+  , checkInputs: Nothing
+  , checkOutputs: Nothing
+  }
 
--- -- | Create a benchmark suite of a given name.
--- -- | The suite will be run with the provided options.
--- -- | The suite is a collection of groups, each containing multiple benchmarks.
--- benchSuite :: String -> (SuiteOpts -> SuiteOpts) -> Array Group -> Suite
--- benchSuite suiteName mkOpts groups_ = Suite
---   { suiteName
---   , run: \_ -> do
---       let opts = mkOpts defaultSuiteOpts
+mkDefaultBenchOpts :: { iterations :: Int } -> BenchOpts Size
+mkDefaultBenchOpts { iterations } =
+  { iterations
+  , prepareInput: \size -> size
+  }
 
---       let groups = mayGetOnlies (map (\(Group g) -> g) groups_)
+--- Core functions
 
---       runReporters opts.reporters \rep -> rep.onSuiteStart suiteName
+-- | Create a benchmark suite of a given name.
+-- | The suite will be run with the provided options.
+-- | The suite is a collection of groups, each containing multiple benchmarks.
+benchSuite :: String -> (SuiteOpts -> SuiteOpts) -> Array Group -> Suite
+benchSuite suiteName mkOpts groups_ = Suite
+  { suiteName
+  , runSuite: \_ -> do
+      let { iterations, sizes, reporters } = mkOpts defaultSuiteOpts
 
---       groupResults <- for groups \group -> do
---         group.run
---           { reporters: opts.reporters
---           , iterations: opts.iterations
---           , sizes: opts.sizes
---           , checkOutputs: Nothing
---           }
+      let reporter = foldr (<>) reportConsole reporters
 
---       let results = { suiteName, groups: groupResults }
+      let groups = mayGetOnlies (map (\(Group g) -> g) groups_)
 
---       runReporters opts.reporters \rep -> rep.onSuiteFinish results
+      reporter.onSuiteStart suiteName
 
---       pure results
---   }
+      groupResults <- for groups \group -> do
+        group.runGroup
+          { reporter, iterations, sizes }
 
--- type Itf out =
---   { add :: Size -> { benchName :: String, output :: out } -> Effect Unit
---   , get :: Effect (Array (ResultPerSize out))
---   }
+      let suiteResult = { groupResults }
 
--- f :: forall out. Effect (Itf out)
--- f = do
---   refOutputs <- Ref.new (Map.empty :: Map Size (ResultPerSize out))
+      --reporter.onSuiteFinish suiteResult
 
---   pure
---     { add: \size out -> Ref.modify_
---         ( Map.alter
---             ( case _ of
---                 Nothing -> Just
---                   { size
---                   , outputs: [ out ]
---                   }
---                 Just val -> Just val { outputs = val.outputs <> [ out ] }
---             )
---             size
---         )
---         refOutputs
+      pure suiteResult
+  }
 
---     , get: do
---         outputs <- Ref.read refOutputs
---         pure $ List.toUnfoldable $ Map.values outputs
---     }
+type PerSizeItf a b =
+  { add :: { size :: Size, benchName :: String, input :: a, output :: b } -> Aff Unit
+  , get ::
+      Aff
+        ( Array
+            { size :: Int
+            , inputs :: Array { input :: a, benchName :: String }
+            , outputs :: Array { output :: b, benchName :: String }
+            }
+        )
+  }
+
+mkPerSizeItf :: forall a b. Aff (PerSizeItf a b)
+mkPerSizeItf = liftEffect do
+  refOutputs <- Ref.new (Map.empty :: Map Size (ResultPerSize a b))
+
+  pure
+    { add: \{ size, benchName, input, output } -> liftEffect $ Ref.modify_
+        ( Map.insertWith (<>) size
+            { inputs: [ { benchName, input } ]
+            , outputs: [ { benchName, output } ]
+            }
+        )
+        refOutputs
+
+    , get: liftEffect do
+        ret <- Ref.read refOutputs
+        pure $ map (\(size /\ val) -> Record.merge { size } val) $ Map.toUnfoldable ret
+    }
 
 -- | Create a benchmark group of a given name.
 -- | The group will be run with the provided options.
 -- | The group is a collection of benchmarks
-benchGroup :: forall a b. Eq b => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench Size b) -> Group
-benchGroup groupName mkOpts benches_ =  unsafeCoerce 1
+benchGroup :: forall a b. Show a => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
+benchGroup groupName mkOpts benches_ =
+  Group $ notOnly
+    { groupName
+    , runGroup: \defOpts@{ reporter } -> do
+        reporter.onGroupStart groupName
 
---Group $ notOnly
---   { groupName
---   , run: \defOpts@{ reporters } -> do
+        let
+          groupOpts@{ sizes, iterations } = mkOpts $ mkDefaultGroupOpts
+            { sizes: defOpts.sizes
+            , iterations: defOpts.iterations
+            }
 
---       let
---         groupOpts = mkOpts
---           { sizes: defOpts.sizes
---           , iterations: defOpts.iterations
---           , checkInputs: Nothing
---           , checkOutputs: Nothing
---           }
+        let
+          benches = mayGetOnlies $ map (\(Bench b) -> b) benches_
 
---       runReporters reporters \rep -> rep.onGroupStart groupName
+        perSizeItf <- mkPerSizeItf
 
---       let benches = mayGetOnlies $ map (\(Bench b) -> b) benches_
+        benchResults <- for benches
+          ( \{ benchName, runBench } -> do
+              reporter.onBenchStart benchName
+              statsWithOutputs <- for sizes
+                ( \size -> do
+                    reporter.onSizeStart size
 
---       refOutputs <- liftEffect $ Ref.new (Map.empty :: Map Size (ResultPerSize out))
+                    { stats, output, input } <- runBench { iterations, size }
 
---       itf <- liftEffect f
+                    reporter.onSizeFinish stats
 
---       results <- for benches \bench -> do
---         runReporters reporters \rep -> rep.onBenchStart bench.benchName
---         r <- for groupOpts.sizes \size -> do
---           runReporters reporters \rep -> rep.onSizeStart size
+                    perSizeItf.add { size, benchName, output, input }
 
---           let benchOpts = mkDefaultBenchOpts groupOpts
+                    pure { stats, output }
+                )
 
---           { duration, iterations } /\ output <- bench.run
---             { size
---             , iterations: groupOpts.iterations
---             , reporters
---             }
+              pure { samples: map _.stats statsWithOutputs }
+          )
 
---           runReporters reporters \rep -> rep.onSizeFinish { size, duration, iterations }
+        -- do
+        --   perSizeOutputs <- perSizeItf.get
+        --   for_ perSizeOutputs \{ size, inputs, outputs } ->
+        --     checkResults { groupOpts, reporter, size, inputs, outputs }
 
---           liftEffect $ itf.add size { benchName: bench.benchName, output }
+        reporter.onGroupFinish { benchResults }
 
---           pure ({ size, duration, iterations } /\ output)
+        pure { benchResults }
+    }
 
---         pure { benchName: bench.benchName, samples: map fst r }
+benchImpl :: forall m a b. Eq b => MonadBench m => String -> (BenchOpts Size -> BenchOpts a) -> (a -> m b) -> Bench a b
+benchImpl benchName mkOpts benchFn =
+  Bench $ notOnly
+    { benchName
+    , runBench: \defOpts@{ size } -> do
 
---       let groupResults = { groupName, benchs: results }
+        let { iterations, prepareInput } = mkOpts $ mkDefaultBenchOpts { iterations: defOpts.iterations }
 
---       outs <- liftEffect itf.get
---       for_ outs $ checkResults groupOpts reporters
+        durs :: NonEmptyList _ <- replicate1A iterations
+          ( do
+              let input = prepareInput size
 
---       runReporters reporters \rep -> rep.onGroupFinish groupResults
+              duration <- measureTime \_ -> do
+                toAff $ benchFn input
 
---       pure groupResults
---   }
+              pure duration
+          )
 
--- -- data Foo out = Foo { check :: GroupOpts ninp out -> ResultPerSize out -> Aff Unit, results :: ResultPerSize out }
+        let input = prepareInput size
 
-benchImpl :: forall m a b. Eq b => MonadBench m => String -> (BenchOpts -> BenchOpts) -> (a -> m b) -> Bench a b
-benchImpl benchName mkOpts benchFn = Bench $ notOnly
-  { benchName
-  , run: \{iterations } input -> do
+        output <- toAff $ benchFn input
 
-      let opts@{ overrideIterations: iterations } = mkOpts defaultBenchOpts
+        let stats = calcStats durs
 
-      durs :: NonEmptyList _ <- replicate1A iterations do
+        pure { stats, output, input }
+    }
 
-        (_ /\ duration) <- measureTime \_ -> do
-          toAff $ benchFn input
-
-        pure duration
-
-      let duration = calcMean durs
-
-      let
-        sampleResult =
-          { iterations
-          , duration
-          }
-
-      output <- toAff do
-        benchFn input
-
-      pure (sampleResult /\ output)
+type ResultPerSize a b =
+  { inputs :: Array { input :: a, benchName :: String }
+  , outputs :: Array { output :: b, benchName :: String }
   }
 
--- type ResultPerSize out = { outputs :: Array { output :: out, benchName :: String }, size :: Size }
-
--- checkResults :: forall ninp out. Show out => Eq out => GroupOpts ninp out -> Array Reporter -> ResultPerSize out -> Aff Unit
--- checkResults groupOpts reporters all@{ size } =
+-- checkResults
+--   :: forall a b
+--    . Show a
+--   => Show b
+--   => { groupOpts :: GroupOpts a b
+--      , reporter :: Reporter
+--      , size :: Size
+--      , inputs :: Array { input :: a, benchName :: String }
+--      , outputs :: Array { output :: b, benchName :: String }
+--      }
+--   -> Aff Unit
+-- checkResults { groupOpts, reporter, size, inputs, outputs } =
 --   for_ groupOpts.checkOutputs \check -> do
 
---     if check { size, outputs: map _.output all.outputs } then do
---       runReporters reporters \rep -> rep.onCheckResults
+--     if check { size, outputs: map _.output outputs } then do
+--       reporter.onCheckResults
 --         { success: true
 --         , size
---         , outputs
+--         , outputs: outputs'
 --         }
 --     else do
---       runReporters reporters \rep -> rep.onCheckResults
+--       reporter.onCheckResults
 --         { success: false
 --         , size
---         , outputs
+--         , outputs: outputs'
 --         }
 --       throwError (error "Benchmarks results are not equal")
 --   where
---   outputs = map (\val -> { strOutput: show val.output, benchName: val.benchName }) all.outputs
+--   outputs' = map (\val -> { strOutput: show val.output, benchName: val.benchName }) outputs
 
--- --- Typeclasses
+--- Typeclasses
 
--- -- | A combinator for entities that can be run only once.
--- -- | This is useful while debugging or developing benchmarks.
--- -- | So you do not have to run the whole suite again and again.
--- class CanRunOnly a where
---   only :: Warn (Text "`only` usage") => a -> a
+-- | A combinator for entities that can be run only once.
+-- | This is useful while debugging or developing benchmarks.
+-- | So you do not have to run the whole suite again and again.
+class CanRunOnly a where
+  only :: Warn (Text "`only` usage") => a -> a
 
--- instance CanRunOnly (Bench a) where
---   only (Bench mayOnly) = Bench (mayOnly { only = true })
+instance CanRunOnly (Bench a b) where
+  only (Bench mayOnly) = Bench $ setOnly true mayOnly
 
--- instance CanRunOnly Group where
---   only (Group mayOnly) = Group (mayOnly { only = true })
+instance CanRunOnly Group where
+  only (Group mayOnly) = Group $ setOnly true mayOnly
 
 -- | A class for monadic benchmarks.
 -- | It allows to run benchmarks in different monads as long as they are capable of
@@ -444,80 +479,107 @@ instance MonadBench Effect where
 instance MonadBench Aff where
   toAff = identity
 
--- --- API shortcuts
+--- API shortcuts
 
--- -- | Create a benchmark of a given name.
--- -- | The benchmark will be run with the provided options.
--- -- | The benchmark is a function that takes an input and returns an output.
--- -- | The input is generated by the prepare function, and the output is processed by the finalize function.
--- bench :: forall arg inp ret out. Eq out => String -> (BenchOptsPure Size Size ret Unit -> BenchOptsPure arg inp ret out) -> (arg -> ret) -> Bench out
--- bench name mkOpts benchFn = benchImpl name (benchOptsPureToAff @Effect <<< mkOpts) (pure <<< benchFn)
+-- | Create a benchmark of a given name.
+-- | The benchmark will be run with the provided options.
+-- | The benchmark is a function that takes an input and returns an output.
+bench :: forall a b. Eq b => String -> (BenchOpts Size -> BenchOpts a) -> (a -> b) -> Bench a b
+bench name mkOpts benchFn = benchImpl name mkOpts (pure @Effect <<< benchFn)
 
--- -- | Like `bench`, but with default options.
--- bench_ :: forall ret. String -> (Size -> ret) -> Bench Unit
--- bench_ name benchFn = bench name identity (benchFn >>> const unit)
+-- | Like `bench`, but with default options.
+bench_ :: forall b. Eq b => String -> (Size -> b) -> Bench Size b
+bench_ name benchFn = bench name identity benchFn
 
--- -- | Like `bench``, but with a monadic function.
--- benchM :: forall m arg inp ret out. MonadBench m => Eq out => String -> (BenchOptsM m Size Size ret Unit -> BenchOptsM m arg inp ret out) -> (arg -> m ret) -> Bench out
--- benchM name mkOpts benchFn = benchImpl name (mkOpts <<< benchOptsPureToAff) benchFn
+-- | Like `bench``, but with a monadic function.
+benchM :: forall m a b. MonadBench m => Eq b => String -> (BenchOpts Size -> BenchOpts a) -> (a -> m b) -> Bench a b
+benchM name mkOpts benchFn = benchImpl name mkOpts benchFn
 
--- -- | Like `benchM`, but with default options.
--- benchM_ :: forall @m out. Eq out => MonadBench m => String -> (Size -> m out) -> Bench Unit
--- benchM_ name benchFn = benchM name identity (benchFn >>> map (const unit))
+-- | Like `benchM`, but with default options.
+benchM_ :: forall m b. MonadBench m => Eq b => String -> (Size -> m b) -> Bench Size b
+benchM_ name benchFn = benchM name identity benchFn
 
--- -- | Like `benchSuite`, but with default options.
--- benchSuite_ :: String -> Array Group -> Suite
--- benchSuite_ groupName benchmarks = benchSuite groupName identity benchmarks
+-- | Like `benchSuite`, but with default options.
+benchSuite_ :: String -> Array Group -> Suite
+benchSuite_ groupName benchmarks = benchSuite groupName identity benchmarks
 
--- -- | Like `benchGroup`, but with default options.
--- benchGroup_ :: String -> Array (Bench Unit) -> Group
--- benchGroup_ groupName benches = benchGroup groupName identity benches
+-- | Like `benchGroup`, but with default options.
+benchGroup_ :: forall b. Show b => Eq b => String -> Array (Bench Size b) -> Group
+benchGroup_ groupName benches = benchGroup groupName identity benches
 
--- ---
+---
 
--- --- Utils
+--- Utils
 
--- runReporters :: Array Reporter -> (Reporter -> Effect Unit) -> Aff Unit
--- runReporters reporters f = liftEffect $ for_ reporters f
-
--- benchOptsPureToAff :: forall @m ninp inp bout out. Applicative m => BenchOptsPure ninp inp bout out -> BenchOptsM m ninp inp bout out
--- benchOptsPureToAff { overrideIterations, prepare, finalize } =
---   { overrideIterations
---   , prepare: \size -> pure $ prepare size
---   , normalizeOutput: \result -> pure $ finalize result
---   }
-
--- mayGetOnlies :: forall a. Array (MayOnly a) -> Array a
--- mayGetOnlies mayOnlies =
---   let
---     onlys = filter _.only mayOnlies
---   in
---     map _.val $ if Array.null onlys then mayOnlies else onlys
+mayGetOnlies :: forall a. Array (MayOnly a) -> Array a
+mayGetOnlies mayOnlies_ =
+  let
+    mayOnlies = map (\(MayOnly mo) -> mo) mayOnlies_
+    onlys = filter _.only mayOnlies
+  in
+    map _.val $ if Array.null onlys then mayOnlies else onlys
 
 notOnly :: forall a. a -> MayOnly a
 notOnly a = MayOnly { only: false, val: a }
 
-measureTime :: forall a m. MonadEffect m => (Unit -> m a) -> m (a /\ Milliseconds)
+measureTime :: forall a m. MonadEffect m => (Unit -> m a) -> m Milliseconds
 measureTime action = do
   startTime <- liftEffect now
-  result <- action unit
+  _ <- action unit
   endTime <- liftEffect now
   let duration = unwrap (unInstant endTime) - unwrap (unInstant startTime)
-  pure (result /\ Milliseconds duration)
+  pure (Milliseconds duration)
 
 calcMean :: NonEmptyList Milliseconds -> Milliseconds
 calcMean items = Milliseconds (sum (map coerce items :: NonEmptyList Number) / Int.toNumber (NEL.length items))
 
--- asciColorStr :: Int -> String -> String
--- asciColorStr color str =
---   let
---     colorCode = "\x1b[" <> show color <> "m"
---     resetCode = "\x1b[0m"
---   in
---     colorCode <> str <> resetCode
+calcMedian :: NonEmptyList Milliseconds -> Milliseconds
+calcMedian items = unsafeCoerce 1
 
--- bgGray :: Int
--- bgGray = 100
+-- let
+--   sorted = List.sort (NEL.toList items)
+--   n = NEL.length items
+-- in
+--   if n `mod` 2 == 0 then
+--     Milliseconds ((sorted !! (n `div` 2 - 1) + sorted !! (n `div` 2)) / 2.0)
+--   else
+--     Milliseconds (sorted !! (n `div` 2))
+
+calcStdDev :: NonEmptyList Milliseconds -> Milliseconds -> Milliseconds
+calcStdDev items (Milliseconds mean) =
+  let
+    n = Int.toNumber (NEL.length items)
+    variance = sum (map (\(Milliseconds x) -> (x - mean) `Number.pow` 2.0) items) / n
+  in
+    Milliseconds (Number.sqrt variance)
+
+type Stats =
+  { mean :: Milliseconds
+  , min :: Milliseconds
+  , max :: Milliseconds
+  , stddev :: Milliseconds
+  }
+
+calcStats :: NonEmptyList Milliseconds -> Stats
+calcStats items =
+  let
+    mean = calcMean items
+    min = minimum items
+    max = maximum items
+    stddev = calcStdDev items mean
+  in
+    { mean, min, max, stddev }
+
+asciColorStr :: Int -> String -> String
+asciColorStr color str =
+  let
+    colorCode = "\x1b[" <> show color <> "m"
+    resetCode = "\x1b[0m"
+  in
+    colorCode <> str <> resetCode
+
+bgGray :: Int
+bgGray = 100
 
 -- memoizeEffect :: forall a b. Ord a => (a -> b) -> Effect (a -> Effect b)
 -- memoizeEffect f = do
@@ -531,75 +593,75 @@ calcMean items = Milliseconds (sum (map coerce items :: NonEmptyList Number) / I
 --         Ref.modify_ (Map.insert x result) cacheRef
 --         pure result
 
--- -- Reporter
+-- Reporter
 
--- -- | Default reporter useful for selective overriding.
--- -- | It will do nothing.
--- defaultReporter :: Reporter
--- defaultReporter =
---   { onSuiteStart: const $ pure unit
---   , onGroupStart: const $ pure unit
---   , onSizeStart: const $ pure unit
---   , onBenchStart: const $ pure unit
---   , onSuiteFinish: const $ pure unit
---   , onGroupFinish: const $ pure unit
---   , onSizeFinish: const $ pure unit
---   , onBenchFinish: const $ pure unit
---   , onCheckResults: const $ pure unit
---   }
+-- | Default reporter useful for selective overriding.
+-- | It will do nothing.
+defaultReporter :: Reporter
+defaultReporter =
+  { onSuiteStart: const $ pure unit
+  , onGroupStart: const $ pure unit
+  , onSizeStart: const $ pure unit
+  , onBenchStart: const $ pure unit
+  , onSuiteFinish: const $ pure unit
+  , onGroupFinish: const $ pure unit
+  , onSizeFinish: const $ pure unit
+  , onBenchFinish: const $ pure unit
+  }
 
--- -- | Console reporter.
--- -- | It will print the results to the console in human readable format.
--- reportConsole :: Reporter
--- reportConsole = defaultReporter
---   { onSuiteStart = \name -> Console.log
---       ("• suite: " <> name)
+-- | Console reporter.
+-- | It will print the results to the console in human readable format.
+reportConsole :: Reporter
+reportConsole = defaultReporter
+  { onSuiteStart = \name -> Console.log
+      ("• suite: " <> name)
 
---   , onGroupStart = \name -> Console.log
---       ("  • group: " <> name)
+  , onGroupStart = \name -> Console.log
+      ("  • group: " <> name)
 
---   , onSizeFinish = \{ size, duration, iterations } -> Console.log
---       ( "      • " <> printStats
---           [ "size" /\ Int.toStringAs Int.decimal size
---           , "avg" /\ printMs duration
---           , "count" /\ Int.toStringAs Int.decimal iterations
---           ]
---       )
+  , onSizeFinish = unsafeCoerce 1
+  --  \{ size, duration, iterations } -> Console.log
+  --     ( "      • " <> printStats
+  --         [ "size" /\ Int.toStringAs Int.decimal size
+  --         , "avg" /\ printMs duration
+  --         , "count" /\ Int.toStringAs Int.decimal iterations
+  --         ]
+  --     )
 
---   , onBenchStart = \benchName -> Console.log
---       ("    • " <> (asciColorStr bgGray ("bench: " <> benchName)))
+  , onBenchStart = \benchName -> Console.log
+      ("    • " <> (asciColorStr bgGray ("bench: " <> benchName)))
 
---   -- , onBenchFinish = \{ duration: dur, iterations } -> Console.log
---   --     ("        • mean duration: " <> printMs dur <> " ms (" <> show iterations <> " iterations)\n")
+  -- , onBenchFinish = \{ duration: dur, iterations } -> Console.log
+  --     ("        • mean duration: " <> printMs dur <> " ms (" <> show iterations <> " iterations)\n")
 
---   , onCheckResults = \{ success, size, outputs } ->
---       if success then Console.log
---         ("    • check: ✓")
---       else do
---         Console.log
---           ("    • check: ✗")
---         for_ outputs \{ benchName, strOutput } -> Console.log
---           ("      • " <> benchName <> ": " <> show size)
---   }
+  -- , onCheckResults = \{ success, size, outputs } ->
+  --     if success then Console.log
+  --       ("    • check: ✓")
+  --     else do
+  --       Console.log
+  --         ("    • check: ✗")
+  --       for_ outputs \{ benchName, strOutput } -> Console.log
+  --         ("      • " <> benchName <> ": " <> show size)
+  }
 
--- printStats :: Array (String /\ String) -> String
--- printStats stats = Str.joinWith ", " (map (\(k /\ v) -> k <> "=" <> v) stats)
+printStats :: Array (String /\ String) -> String
+printStats stats = Str.joinWith ", " (map (\(k /\ v) -> k <> "=" <> v) stats)
 
--- printMs :: Milliseconds -> String
--- printMs (Milliseconds ms) = NumFmt.toStringWith (NumFmt.fixed 4) ms <> "ms"
+printMs :: Milliseconds -> String
+printMs (Milliseconds ms) = NumFmt.toStringWith (NumFmt.fixed 4) ms <> "ms"
 
--- padLeft :: Int -> String -> String
--- padLeft n str =
---   let
---     len = Str.length str
---     pad = Str.joinWith "" $ replicate (n - len) " "
---   in
---     pad <> str
+padLeft :: Int -> String -> String
+padLeft n str =
+  let
+    len = Str.length str
+    pad = Str.joinWith "" $ replicate (n - len) " "
+  in
+    pad <> str
 
--- padRight :: Int -> String -> String
--- padRight n str =
---   let
---     len = Str.length str
---     pad = Str.joinWith "" $ replicate (n - len) " "
---   in
---     str <> pad
+padRight :: Int -> String -> String
+padRight n str =
+  let
+    len = Str.length str
+    pad = Str.joinWith "" $ replicate (n - len) " "
+  in
+    str <> pad
