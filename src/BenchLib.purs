@@ -143,7 +143,7 @@ newtype Suite = Suite
       , reporter :: Reporter
       , sizes :: Array Size
       }
-      -> Aff { groupResults :: Array GroupResult }
+      -> Aff SuiteResult
   }
 
 -- | Opaque type for the benchmark group.
@@ -155,11 +155,7 @@ newtype Group = Group
           , iterations :: Int
           , sizes :: Array Int
           }
-          -> Aff
-               { benchResults ∷ Array BenchResult
-               , checkInputsResults :: Maybe (Array CheckResults)
-               , checkOutputsResults :: Maybe (Array CheckResults)
-               }
+          -> Aff GroupResult
       }
   )
 
@@ -171,7 +167,7 @@ newtype Bench a b = Bench
           { iterations :: Int
           , size :: Size
           }
-          -> Aff { benchResult :: SampleResult, input :: a, output :: b }
+          -> Aff { sampleResult :: SampleResult, input :: a, output :: b }
       }
   )
 
@@ -235,16 +231,11 @@ run mkOpts (Suite { runSuite, suiteName }) = launchAff_ do
 
   let { iterations, sizes } = defaultSuiteOpts
 
-  _suiteResult <- runWrapped
-    { before: reporter.onSuiteStart suiteName
-    , after: reporter.onSuiteFinish
-    }
-    do
-      { groupResults } <- runSuite { reporter, iterations, sizes }
-      pure
-        { groupResults
-        , suiteName
-        }
+  reporter.onSuiteStart suiteName
+
+  suiteResult <- runSuite { reporter, iterations, sizes }
+
+  reporter.onSuiteFinish suiteResult
 
   pure unit
 
@@ -309,23 +300,16 @@ benchSuite suiteName mkOpts groups_ = Suite
         ( do
             reporter.onGroupStart groupName
 
-            groupResult <-
-              ( do
-                  { benchResults, checkOutputsResults, checkInputsResults } <- runGroup { reporter, iterations, sizes }
-                  pure
-                    { groupName
-                    , benchResults
-                    , checkOutputsResults
-                    , checkInputsResults
-                    }
-              )
+            groupResult <- runGroup { reporter, iterations, sizes }
 
             reporter.onGroupFinish groupResult
             pure groupResult
         )
 
-      reporter.onSuiteFinish { groupResults, suiteName }
-      pure { groupResults }
+      let suiteResult = { groupResults, suiteName }
+
+      reporter.onSuiteFinish suiteResult
+      pure suiteResult
 
   }
 
@@ -395,8 +379,7 @@ benchGroup groupName mkOpts benches_ =
             , iterations: defOpts.iterations
             }
 
-        let
-          benches = mayGetOnlies $ map (\(Bench b) -> b) benches_
+        let benches = mayGetOnlies $ map (\(Bench b) -> b) benches_
 
         perSizeItf <- mkPerSizeItf groupOpts
 
@@ -406,26 +389,28 @@ benchGroup groupName mkOpts benches_ =
               samples <- for sizes
                 ( \size -> do
 
-                    { benchResult, output, input } <-
-                      (runBench { iterations, size })
+                    reporter.onSampleStart size
+
+                    { sampleResult, output, input } <- runBench { iterations, size }
 
                     perSizeItf.add { size, benchName, output, input }
 
-                    pure benchResult
+                    reporter.onSampleFinish sampleResult
+
+                    pure sampleResult
                 )
 
-              reporter.onBenchFinish
-                { benchName
-                , samples
-                }
+              let benchResult = { benchName, samples }
 
-              pure { benchName, samples }
+              reporter.onBenchFinish benchResult
+
+              pure benchResult
           )
 
         checkOutputsResults <- perSizeItf.getCheckOutputsResults
         checkInputsResults <- perSizeItf.getCheckOutputsResults
 
-        pure { benchResults, checkOutputsResults, checkInputsResults }
+        pure { groupName, benchResults, checkOutputsResults, checkInputsResults }
     }
 
 benchImpl :: forall m a b. Eq b => MonadBench m => String -> (BenchOpts Size -> BenchOpts a) -> (a -> m b) -> Bench a b
@@ -452,45 +437,15 @@ benchImpl benchName mkOpts benchFn =
 
         let stats = calcStats durs
 
-        let benchResult = { size, stats }
+        let sampleResult = { size, stats }
 
-        pure { benchResult, output, input }
+        pure { sampleResult, output, input }
     }
 
 type ResultPerSize a b =
   { inputs :: Array { input :: a, benchName :: String }
   , outputs :: Array { output :: b, benchName :: String }
   }
-
--- checkResults
---   :: forall a b
---    . Show a
---   => Show b
---   => { groupOpts :: GroupOpts a b
---      , reporter :: Reporter
---      , size :: Size
---      , inputs :: Array { input :: a, benchName :: String }
---      , outputs :: Array { output :: b, benchName :: String }
---      }
---   -> Aff Unit
--- checkResults { groupOpts, reporter, size, inputs, outputs } =
---   for_ groupOpts.checkOutputs \check -> do
-
---     if check { size, outputs: map _.output outputs } then do
---       reporter.onCheckResults
---         { success: true
---         , size
---         , outputs: outputs'
---         }
---     else do
---       reporter.onCheckResults
---         { success: false
---         , size
---         , outputs: outputs'
---         }
---       throwError (error "Benchmarks results are not equal")
---   where
---   outputs' = map (\val -> { strOutput: show val.output, benchName: val.benchName }) outputs
 
 --- Typeclasses
 
@@ -548,8 +503,6 @@ benchSuite_ groupName benchmarks = benchSuite groupName identity benchmarks
 -- | Like `benchGroup`, but with default options.
 benchGroup_ :: forall b. Show b => Eq b => String -> Array (Bench Size b) -> Group
 benchGroup_ groupName benches = benchGroup groupName identity benches
-
----
 
 --- Utils
 
@@ -622,13 +575,6 @@ asciColorStr color str =
 
 bgGray :: Int
 bgGray = 100
-
-runWrapped :: forall m a. Monad m => { before :: m Unit, after :: a -> m Unit } -> m a -> m a
-runWrapped { before, after } action = do
-  before
-  result <- action
-  after result
-  pure result
 
 -- Reporter
 
