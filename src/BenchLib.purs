@@ -1,16 +1,3 @@
--- | A benchmark, slightly simplified, can be seen as this three step transformation:
--- |
--- | 1. `prepare :: size -> input`
--- | 2. `benchmark :: input -> return`
--- | 3. `finalize :: return -> output`
--- |
--- | Common type variables:
--- |   - `inp`: type of input for benchmark, can be diifferent for each benchmark in a group. It is created by the `prepare` function.
--- |   - `ret`: type of result of benchmark, can be diifferent for each benchmark in a group.
--- |   - `out`: type of output of the benchmark, must be equal for all benchmarks in a group. Created by the `finalize` function. 
--- |     Having this extra type variable e.g. allows to check if benchmark results of a group do return values considered equal.
--- |   - `m`: the monad in which the benchmark is run. It must be an instance of `MonadBench`. Instances are provided for `Effect` and `Aff`. 
-
 module BenchLib
   ( Size
   , Bench
