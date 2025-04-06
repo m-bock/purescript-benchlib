@@ -27,11 +27,11 @@ module BenchLib
   , BenchOpts
   , Stats
   , Reporter
-  -- , Size
   , benchSuite
   , benchGroup
   , bench
   , benchM
+  , run_
   , benchSuite_
   , benchGroup_
   , benchM_
@@ -39,12 +39,11 @@ module BenchLib
   , checkEq
   , class MonadBench
   , toAff
-  -- , class CanRunOnly
-  -- , only
+  , class CanRunOnly
+  , only
   , defaultReporter
   , reportConsole
   , run
-  -- , eval
   ) where
 
 import Prelude
@@ -172,7 +171,7 @@ newtype Bench a b = Bench
           { iterations :: Int
           , size :: Size
           }
-          -> Aff { stats :: Stats, input :: a, output :: b }
+          -> Aff { benchResult :: SampleResult, input :: a, output :: b }
       }
   )
 
@@ -234,31 +233,20 @@ run mkOpts (Suite { runSuite, suiteName }) = launchAff_ do
     runOpts = mkOpts defaultRunOpts
     reporter = foldr (<>) defaultReporter runOpts.reporters
 
-  void $ runWrapped
+  let { iterations, sizes } = defaultSuiteOpts
+
+  _suiteResult <- runWrapped
     { before: reporter.onSuiteStart suiteName
     , after: reporter.onSuiteFinish
     }
-    ( do
-        { groupResults } <- runSuite
-          { reporter
-          , iterations: defaultSuiteOpts.iterations
-          , sizes: defaultSuiteOpts.sizes
-          }
-        pure
-          { groupResults
-          , suiteName
-          }
-    )
+    do
+      { groupResults } <- runSuite { reporter, iterations, sizes }
+      pure
+        { groupResults
+        , suiteName
+        }
 
-runWrapped :: forall m a. Monad m => { before :: m Unit, after :: a -> m Unit } -> m a -> m a
-runWrapped { before, after } action = do
-  before
-  result <- action
-  after result
-  pure result
-
-run_ :: Suite -> Effect Unit
-run_ suite = run identity suite
+  pure unit
 
 --- Exported utility functions
 
@@ -313,30 +301,32 @@ benchSuite suiteName mkOpts groups_ = Suite
   { suiteName
   , runSuite: \{ reporter } -> do
       let { iterations, sizes } = mkOpts defaultSuiteOpts
-
       let groups = mayGetOnlies (map (\(Group g) -> g) groups_)
 
-      do
-        -- reporter.onSuiteStart suiteName
+      reporter.onSuiteStart suiteName
 
-        groupResults <- for groups \{ runGroup, groupName } -> do
-          reporter.onGroupStart groupName
-          { benchResults, checkOutputsResults, checkInputsResults } <- runGroup { reporter, iterations, sizes }
-          let
-            groupResult =
-              { groupName
-              , benchResults
-              , checkOutputsResults
-              , checkInputsResults
-              }
-          reporter.onGroupFinish groupResult
-          pure groupResult
+      groupResults <- for groups \{ runGroup, groupName } ->
+        ( do
+            reporter.onGroupStart groupName
 
-        let suiteResult = { groupResults }
+            groupResult <-
+              ( do
+                  { benchResults, checkOutputsResults, checkInputsResults } <- runGroup { reporter, iterations, sizes }
+                  pure
+                    { groupName
+                    , benchResults
+                    , checkOutputsResults
+                    , checkInputsResults
+                    }
+              )
 
-        --reporter.onSuiteFinish suiteResult
+            reporter.onGroupFinish groupResult
+            pure groupResult
+        )
 
-        pure suiteResult
+      reporter.onSuiteFinish { groupResults, suiteName }
+      pure { groupResults }
+
   }
 
 type PerSizeItf a b =
@@ -412,20 +402,22 @@ benchGroup groupName mkOpts benches_ =
 
         benchResults <- for benches
           ( \{ benchName, runBench } -> do
-              --reporter.onBenchStart benchName
+              reporter.onBenchStart benchName
               samples <- for sizes
                 ( \size -> do
 
-                    { stats, output, input } <- runWrapped
-                      { before: reporter.onSampleStart size
-                      , after: \{stats} -> reporter.onSampleFinish {size, stats }
-                      }
+                    { benchResult, output, input } <-
                       (runBench { iterations, size })
 
                     perSizeItf.add { size, benchName, output, input }
 
-                    pure { size, stats }
+                    pure benchResult
                 )
+
+              reporter.onBenchFinish
+                { benchName
+                , samples
+                }
 
               pure { benchName, samples }
           )
@@ -460,7 +452,9 @@ benchImpl benchName mkOpts benchFn =
 
         let stats = calcStats durs
 
-        pure { stats, output, input }
+        let benchResult = { size, stats }
+
+        pure { benchResult, output, input }
     }
 
 type ResultPerSize a b =
@@ -532,13 +526,16 @@ instance MonadBench Aff where
 bench :: forall a b. Eq b => String -> (BenchOpts Size -> BenchOpts a) -> (a -> b) -> Bench a b
 bench name mkOpts benchFn = benchImpl name mkOpts (pure @Effect <<< benchFn)
 
+-- | Like `bench``, but with a monadic function.
+benchM :: forall m a b. MonadBench m => Eq b => String -> (BenchOpts Size -> BenchOpts a) -> (a -> m b) -> Bench a b
+benchM name mkOpts benchFn = benchImpl name mkOpts benchFn
+
 -- | Like `bench`, but with default options.
 bench_ :: forall b. Eq b => String -> (Size -> b) -> Bench Size b
 bench_ name benchFn = bench name identity benchFn
 
--- | Like `bench``, but with a monadic function.
-benchM :: forall m a b. MonadBench m => Eq b => String -> (BenchOpts Size -> BenchOpts a) -> (a -> m b) -> Bench a b
-benchM name mkOpts benchFn = benchImpl name mkOpts benchFn
+run_ :: Suite -> Effect Unit
+run_ suite = run identity suite
 
 -- | Like `benchM`, but with default options.
 benchM_ :: forall m b. MonadBench m => Eq b => String -> (Size -> m b) -> Bench Size b
@@ -626,17 +623,12 @@ asciColorStr color str =
 bgGray :: Int
 bgGray = 100
 
--- memoizeEffect :: forall a b. Ord a => (a -> b) -> Effect (a -> Effect b)
--- memoizeEffect f = do
---   cacheRef <- Ref.new Map.empty
---   pure \x -> do
---     cache <- Ref.read cacheRef
---     case Map.lookup x cache of
---       Just result -> pure result
---       Nothing -> do
---         let result = f x
---         Ref.modify_ (Map.insert x result) cacheRef
---         pure result
+runWrapped :: forall m a. Monad m => { before :: m Unit, after :: a -> m Unit } -> m a -> m a
+runWrapped { before, after } action = do
+  before
+  result <- action
+  after result
+  pure result
 
 -- Reporter
 
