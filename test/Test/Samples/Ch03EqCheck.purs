@@ -7,6 +7,7 @@ import Prelude
 import BenchLib (bench, benchGroup, benchSuite_)
 import BenchLib as BenchLib
 import Data.Array as Array
+import Data.Bifunctor (bimap)
 import Data.Foldable (all)
 import Data.List.Lazy as LazyList
 import Data.Maybe (Maybe(..))
@@ -15,28 +16,33 @@ import Effect (Effect)
 --- Main
 
 main :: Effect Unit
-main = BenchLib.run $
+main = BenchLib.run_ $
   benchSuite_
     "Minimal Example"
     [ benchGroup "Replicate Functions"
         ( \cfg -> cfg
             { checkOutputs =
-                Just \{ outputs, size } -> all (_ == Array.replicate size 'x') outputs
+                Just \{ values, size } -> all (_ == Array.replicate size 'x') values
+            , checkInputs =
+                Just \{ values, size } -> all (_ == Array.replicate size 'x') values
             }
         )
-        [ bench "Array"
+        [ bench
+            "Array"
             ( \cfg -> cfg
-                { finalize = identity
-                }
-            )
-            (\size -> Array.replicate size 'x')
+                { prepareInput = \size -> Array.replicate size 'x'
 
-        , bench "Lazy List"
-            ( \cfg -> cfg
-                { finalize = LazyList.toUnfoldable
                 }
             )
-            (\size -> LazyList.replicate size 'x')
+            (\xs -> Array.snoc xs 'y')
+
+        , bimap Array.fromFoldable Array.fromFoldable $ bench
+            "Lazy List"
+            ( \cfg -> cfg
+                { prepareInput = \size -> LazyList.replicate size 'x'
+                }
+            )
+            (\xs -> LazyList.cons 'y' xs)
         ]
     ]
 

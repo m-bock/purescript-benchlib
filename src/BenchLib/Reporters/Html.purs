@@ -8,6 +8,8 @@ module BenchLib.Reporters.Html
 
 import Prelude
 
+import BenchLib (Reporter, SuiteResult, defaultReporter)
+import BenchLib.Reporters.Json (codecSuiteResult)
 import Data.Argonaut as Json
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
@@ -19,11 +21,10 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (foldl)
 import Effect (Effect)
+import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync as FS
-import BenchLib (Reporter, SuiteResults, defaultReporter)
-import BenchLib.Reporters.Json (codecSuiteResults)
 
 type Opts =
   { lineStyles :: Array LineStyle
@@ -62,7 +63,7 @@ defaultOpts =
   opacity = 0.5
   width = 2.0
 
-writeHtml :: Opts -> SuiteResults -> Effect Unit
+writeHtml :: Opts -> SuiteResult -> Effect Unit
 writeHtml opts suiteResults = do
   template <- FS.readTextFile UTF8 "src/BenchLib/Reporters/template.html"
 
@@ -93,7 +94,7 @@ reportHtml mkOpts =
     opts = mkOpts defaultOpts
   in
     defaultReporter
-      { onSuiteFinish = \suiteResults -> do
+      { onSuiteFinish = \suiteResults -> liftEffect do
           writeHtml opts suiteResults
           Console.error ("Wrote HTML report to " <> opts.filePath)
       }
@@ -108,13 +109,13 @@ indent indentStr str = Str.split (Pattern pat) str # map (indentStr <> _) # Str.
 
 type Config =
   { lineStyles :: Array LineStyle
-  , data :: SuiteResults
+  , data :: SuiteResult
   }
 
 codecConfig :: JsonCodec Config
 codecConfig = CAR.object "Config"
   { lineStyles: CA.array codecLineStyle
-  , data: codecSuiteResults
+  , data: codecSuiteResult
   }
 
 codecLineStyle :: JsonCodec LineStyle

@@ -3,7 +3,8 @@
 module Test.Samples.MarkdownReporter (main) where
 
 import Prelude
-import BenchLib (benchGroup_, benchSuite, bench_)
+
+import BenchLib (basic, benchGroup_, benchSuite, bench_)
 import BenchLib as BenchLib
 import BenchLib.Reporters.Html (reportHtml)
 import BenchLib.Reporters.Json (reportJson)
@@ -39,21 +40,20 @@ reporters =
 --- Main
 
 main :: Effect Unit
-main = BenchLib.run $
+main = BenchLib.run_ $
   benchSuite
     "Minimal Example"
     ( \cfg -> cfg
         { iterations = 1000
         , sizes = [ 0, 20_000, 40_000, 80_000 ]
-        , reporters = cfg.reporters <> reporters
         }
     )
     [ benchGroup_ "Replicate functions"
-        [ bench_
+        [ basic $ bench_
             "Array"
             (\size -> Array.replicate size 'x')
 
-        , bench_
+        , basic $ bench_
             "Lazy List"
             (\size -> LazyList.replicate size 'x')
         ]

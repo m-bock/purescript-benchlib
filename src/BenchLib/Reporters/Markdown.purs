@@ -6,7 +6,7 @@ module BenchLib.Reporters.Markdown
 
 import Prelude
 
-import BenchLib (BenchResult, GroupResults, Reporter, SuiteResults, Size, defaultReporter)
+import BenchLib (BenchResult, GroupResult, Reporter, SuiteResult, Size, defaultReporter)
 import Data.Array ((!!))
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
@@ -21,6 +21,7 @@ import Data.String as Str
 import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (unfoldr)
+import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (writeTextFile)
@@ -46,22 +47,22 @@ reportMarkdown mkOpts =
     opts = mkOpts defaultOpts
   in
     defaultReporter
-      { onSuiteFinish = \suiteResults -> do
-          writeTextFile UTF8 opts.filePath $ toSuiteMd opts suiteResults
+      { onSuiteFinish = \suiteResult -> liftEffect do
+          writeTextFile UTF8 opts.filePath $ toSuiteMd opts suiteResult
           Console.error ("Wrote Markdown report to " <> opts.filePath)
       }
 
-toSuiteMd :: Opts ->  SuiteResults -> String
-toSuiteMd opts { groups, suiteName } = Str.joinWith "\n"
+toSuiteMd :: Opts ->  SuiteResult -> String
+toSuiteMd opts { groupResults, suiteName } = Str.joinWith "\n"
   [ if opts.showHeadline then "# " <> suiteName else ""
-  , Str.joinWith "\n" $ map groupToMd groups
+  , Str.joinWith "\n" $ map groupToMd groupResults
   ]
 
 colors :: Array String
 colors = [ "ff3456", "00ff00", "0000ff", "ffff00", "ff00ff", "00ffff" ]
 
-groupToMd :: GroupResults -> String
-groupToMd { benchs, groupName } = Str.joinWith "\n"
+groupToMd :: GroupResult -> String
+groupToMd { benchResults, groupName } = Str.joinWith "\n"
   [ "```mermaid"
   , "---"
   , "  config:"
@@ -71,17 +72,17 @@ groupToMd { benchs, groupName } = Str.joinWith "\n"
   , "---"
   , "xychart-beta"
   , "  title \"" <> groupName <> "\""
-  , "  x-axis \"Input Size\" [" <> getXTicks' sizes benchs <> "]"
+  , "  x-axis \"Input Size\" [" <> getXTicks' sizes benchResults <> "]"
   , "  y-axis \"Time (in ms)\" 0 --> 1"
   -- , "  line [100, 200, 300]"
-  , Str.joinWith "\n" $ map (("  " <> _) <<< getLine' sizes) benchs
+  , Str.joinWith "\n" $ map (("  " <> _) <<< getLine' sizes) benchResults
   , "```"
   , Str.joinWith "&nbsp;&nbsp;" $ mapWithIndex getLegendItem benchNames
 
   ]
   where 
-    sizes = join $ map (_.samples >>> map _.size) benchs
-    benchNames = map _.benchName benchs
+    sizes = join $ map (_.samples >>> map _.size) benchResults
+    benchNames = map _.benchName benchResults
 
 
 getLegendItem :: Int -> String -> String
@@ -101,7 +102,7 @@ getLegendItem i name =
 getLine' :: Array Size -> BenchResult -> String
 getLine' sizes bench = "line [" <> (Str.joinWith ", " $ map Number.toString durs) <> "]"
   where
-    mp = Map.fromFoldable $ map (\{size, duration: Milliseconds duration } -> size /\ duration) bench.samples
+    mp = Map.fromFoldable $ map (\{size, stats: {mean : Milliseconds mean } } -> size /\ mean) bench.samples
     durs = map (\size -> fromMaybe 0.0 $ Map.lookup size mp) sizes
 
 getXTicks' ::  Array Size ->  Array BenchResult -> String
