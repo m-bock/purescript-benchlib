@@ -25,6 +25,7 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console as Console
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync as FS
+import Node.Process as Process
 
 type Opts =
   { lineStyles :: Array LineStyle
@@ -96,7 +97,7 @@ reportHtml mkOpts =
     defaultReporter
       { onSuiteFinish = \suiteResults -> liftEffect do
           writeHtml opts suiteResults
-          Console.error ("Wrote HTML report to " <> opts.filePath)
+          Console.log ("Wrote HTML report to " <> opts.filePath)
       }
 
 reportHtml_ :: Reporter

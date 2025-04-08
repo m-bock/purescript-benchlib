@@ -1,6 +1,7 @@
 package:
   name: benchlib
   dependencies:
+    - debug
     - exists
     - aff: ">=8.0.0 <9.0.0"
     - argonaut: ">=9.0.0 <10.0.0"

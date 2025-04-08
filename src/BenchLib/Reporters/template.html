@@ -125,7 +125,7 @@
 
         document.body.appendChild(container);
 
-        dataConfig.groups.forEach((group, groupIndex) => {
+        dataConfig.groupResults.forEach((group, groupIndex) => {
           const chartContainer = document.createElement("div");
           chartContainer.style.marginBottom = "40px";
 
@@ -139,29 +139,31 @@
 
           container.appendChild(chartContainer);
 
-          const labels = [...new Set(group.benchs.map((bench) => bench.size))];
+          const labels = [
+            ...new Set(
+              group.benchResults.flatMap((bench) =>
+                bench.samples.map((sample) => sample.size)
+              )
+            ),
+          ];
 
-          const datasets = Object.values(
-            group.benchs.reduce((acc, bench, index) => {
-              if (!acc[bench.benchName]) {
-                const style =
-                  config.lineStyles[index % config.lineStyles.length];
-                const rgbaColor = `rgba(${style.color.r}, ${style.color.g}, ${style.color.b}, ${style.opacity})`;
+          const datasets = group.benchResults.map((bench, index) => {
+            const style = config.lineStyles[index % config.lineStyles.length];
+            const rgbaColor = `rgba(${style.color.r}, ${style.color.g}, ${style.color.b}, ${style.opacity})`;
 
-                acc[bench.benchName] = {
-                  label: bench.benchName,
-                  data: [],
-                  borderColor: rgbaColor,
-                  borderWidth: style.width,
-                  backgroundColor: rgbaColor,
-                  fill: false,
-                  tension: 0.1,
-                };
-              }
-              acc[bench.benchName].data.push(bench.duration);
-              return acc;
-            }, {})
-          );
+            return {
+              label: bench.benchName,
+              data: bench.samples.map((sample) => ({
+                x: sample.size,
+                y: sample.average,
+              })),
+              borderColor: rgbaColor,
+              borderWidth: style.width,
+              backgroundColor: rgbaColor,
+              fill: false,
+              tension: 0.1,
+            };
+          });
 
           new Chart(canvas.getContext("2d"), {
             type: "line",

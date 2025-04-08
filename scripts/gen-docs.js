@@ -1,9 +1,11 @@
 import * as fs from "fs";
 import * as cp from "child_process";
+import { fileURLToPath } from 'url';
+import * as path from 'path';
 
 const files = {};
 
-const convertCode = ({ file, section, collapsible, link }) => {
+const convertPursCode = ({ file, section, collapsible, link }) => {
   const filePath = file; // Change this to your actual file
   const fileContent = fs.readFileSync(filePath, "utf8");
 
@@ -33,16 +35,43 @@ const convertCode = ({ file, section, collapsible, link }) => {
   ].join("\n");
 };
 
+const convertCode = ({ file, link, collapsible, language }) => {
+  const fileContent = fs.readFileSync(file, "utf8");
+  return [
+    link ? "Source Code: " + mkLink(`${file}`, file) : "",
+    (collapsible ? mkCollapsible : identity)(
+      mkCodeBlock(language || "text", fileContent, true)
+    ),
+  ].join("\n");
+};
+
 const convertRaw = ({ file }) => {
   const filePath = file; // Change this to your actual file
   const fileContent = fs.readFileSync(filePath, "utf8");
   return fileContent;
 };
 
-const convertRun = ({ cmd, hide, text }) => {
-  const stdout = cp.execSync(cmd, { encoding: "utf8" });
+const replaceMustache = (replaceMap, val) => {
+  return val.replace(/\{\{([a-zA-Z-0-9_-]+)\}\}/g, (match, key) => {
+    const replacement = replaceMap[key];
+    if (replacement === undefined) {
+      throw new Error(`No replacement found for key: ${key}`);
+    }
+    return replacement;
+  })
+};
+
+const convertRun = ({ cmd, hide, hideCmd, text }) => {
+  const realCmd = replaceMustache(
+    {
+      cwd: process.cwd(),
+    },
+    cmd
+  );
+  console.error("Running command:", realCmd);
+  const stdout = cp.execSync(realCmd, { encoding: "utf8" });
   return [
-    mkCodeBlock("bash", cmd),
+    hideCmd ? "" : mkCodeBlock("bash", cmd),
     text ? text : "",
     hide ? "" : "\n" + mkCodeBlock("text", removeAnsiColors(stdout)),
   ].join("\n");
@@ -78,17 +107,18 @@ const mkCodeBlock = (lang, content, quote) => {
 };
 
 const fns = {
-  code: convertCode,
+  pursCode: convertPursCode,
   run: convertRun,
   raw: convertRaw,
+  code: convertCode,
 };
 
 const mainFile = (filePath) => {
   const fileContent = fs.readFileSync(filePath, "utf8");
 
   const updatedContent = fileContent.replace(
-    /(<!-- start:([a-z]+)\s*\n(\{[^}]+\})\n*-->)[\s\S]*?(<!-- end -->)/g,
-    (match, start, fnName, jsonString, end) => {
+    /(<!-- start:([a-zA-Z0-9_]+)\n([\s\S]*?)-->)[\s\S]*?(<!-- end -->)/g,
+    (_, start, fnName, jsonString, end) => {
       const json = JSON.parse(jsonString);
       const convertFn = fns[fnName];
       const converted = convertFn(json);
@@ -106,16 +136,54 @@ const mainFile = (filePath) => {
   });
 };
 
-const main = () => {
-  const folder = "docs/chapters";
+const genReadme = (folder, files) => {
+  return [
+    "# Benchlib Guide",
 
-  const files = fs.readdirSync(folder);
+    "This is a guide to the Benchlib library. It contains various examples and explanations.",
+
+    "## Table of Contents",
+    ...files
+      .filter((file) => file !== "README.md")
+      .map((file) => {
+        const fileName = file.replace(/\.md$/, "");
+        const h1 = extractH1(path.join(folder, file));
+        return `- [${h1}](${file})`;
+      }),
+  ].join("\n");
+}
+
+const extractH1 = (file) => {
+  const fileContent = fs.readFileSync(file, "utf8");
+  const h1Regex = /^# (.+)$/gm;
+  const match = h1Regex.exec(fileContent);
+  return match ? match[1] : null;
+}
+
+const mainFolder = ({folder, filter}) => {
+  const files = fs.readdirSync(folder).filter((file) => 
+    fs.statSync(path.join(folder, file)).isFile())
+
   files.forEach((file) => {
-    const filePath = `${folder}/${file}`;
-    if (fs.statSync(filePath).isFile()) {
-      mainFile(filePath);
-    }
+    const fileName = path.join(folder, file);
+    if (filter && !filter.test(fileName)) return;
+    if (file === "README.md") return;
+    
+      mainFile(fileName);
+    
   });
+
+  const readme = genReadme(folder, files);
+  fs.writeFileSync(`${folder}/README.md`, readme, "utf8");
 };
+
+const main = () => {
+  const opts = {
+    folder: "docs/chapters",
+    filter: /02/,
+  }
+
+  mainFolder(opts);
+}
 
 main();

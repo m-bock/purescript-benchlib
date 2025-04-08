@@ -2,7 +2,7 @@ module Test.Samples.Simple where
 
 import Prelude
 
-import BenchLib (basic, bench, benchGroup_, benchSuite, reportConsole)
+import BenchLib (basic, bench, group_, suite, reportConsole)
 import BenchLib as BenchLib
 import BenchLib.Reporters.Html (reportHtml_)
 import BenchLib.Reporters.Json (reportJson_)
@@ -21,7 +21,7 @@ main =
             ]
         }
     ) $
-    benchSuite
+    suite
       "Simple Example"
       -- set suite options by overriding default config:
       ( \cfg -> cfg
@@ -29,7 +29,7 @@ main =
           , sizes = [ 20_000, 40_000, 80_000 ] -- input sizes for prepare functions
           }
       )
-      [ benchGroup_
+      [ group_
           "List operations"
           [ basic $ bench
               "Add item to the end of a list"

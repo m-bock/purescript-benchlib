@@ -33,9 +33,9 @@ type Opts =
   }
 
 defaultOpts :: Opts
-defaultOpts = { 
-  filePath: "bench-results.md" ,
-  showHeadline: false
+defaultOpts =
+  { filePath: "bench-results.md"
+  , showHeadline: false
   }
 
 reportMarkdown_ :: Reporter
@@ -49,10 +49,10 @@ reportMarkdown mkOpts =
     defaultReporter
       { onSuiteFinish = \suiteResult -> liftEffect do
           writeTextFile UTF8 opts.filePath $ toSuiteMd opts suiteResult
-          Console.error ("Wrote Markdown report to " <> opts.filePath)
+          Console.log ("Wrote Markdown report to " <> opts.filePath)
       }
 
-toSuiteMd :: Opts ->  SuiteResult -> String
+toSuiteMd :: Opts -> SuiteResult -> String
 toSuiteMd opts { groupResults, suiteName } = Str.joinWith "\n"
   [ if opts.showHeadline then "# " <> suiteName else ""
   , Str.joinWith "\n" $ map groupToMd groupResults
@@ -68,11 +68,11 @@ groupToMd { benchResults, groupName } = Str.joinWith "\n"
   , "  config:"
   , "    themeVariables:"
   , "        xyChart:"
-  , "            plotColorPalette: \"" <> Str.joinWith ", " (map ("#" <> _) colors)  <> "\""
+  , "            plotColorPalette: \"" <> Str.joinWith ", " (map ("#" <> _) colors) <> "\""
   , "---"
   , "xychart-beta"
   , "  title \"" <> groupName <> "\""
-  , "  x-axis \"Input Size\" [" <> getXTicks' sizes benchResults <> "]"
+  , "  x-axis \"Input Size\" [" <> getXTicks' sizes <> "]"
   , "  y-axis \"Time (in ms)\" 0 --> 1"
   -- , "  line [100, 200, 300]"
   , Str.joinWith "\n" $ map (("  " <> _) <<< getLine' sizes) benchResults
@@ -80,20 +80,18 @@ groupToMd { benchResults, groupName } = Str.joinWith "\n"
   , Str.joinWith "&nbsp;&nbsp;" $ mapWithIndex getLegendItem benchNames
 
   ]
-  where 
-    sizes = join $ map (_.samples >>> map _.size) benchResults
-    benchNames = map _.benchName benchResults
-
+  where
+  sizes = Array.nub $ join $ map (_.samples >>> map _.size) benchResults
+  benchNames = map _.benchName benchResults
 
 getLegendItem :: Int -> String -> String
-getLegendItem i name = 
+getLegendItem i name =
   let
-    color = fromMaybe "white" ( colors !! (i `mod` Array.length colors))
-  in "![" <> color <> "](https://placehold.co/8x8/" <> color <> "/" <> color <> ".png) " <> name <> ""  
-  
-  -- "<span style=\"background-color: " <> color <> ";\">" <> name <> "</span>"  
+    color = fromMaybe "white" (colors !! (i `mod` Array.length colors))
+  in
+    "![" <> color <> "](https://placehold.co/8x8/" <> color <> "/" <> color <> ".png) " <> name <> ""
 
-
+-- "<span style=\"background-color: " <> color <> ";\">" <> name <> "</span>"  
 
 -- - ![#f03c15](https://placehold.co/15x15/f03c15/f03c15.png) `#f03c15`
 -- - ![#c5f015](https://placehold.co/15x15/c5f015/c5f015.png) `#c5f015`
@@ -102,13 +100,11 @@ getLegendItem i name =
 getLine' :: Array Size -> BenchResult -> String
 getLine' sizes bench = "line [" <> (Str.joinWith ", " $ map Number.toString durs) <> "]"
   where
-    mp = Map.fromFoldable $ map (\{size, stats: {mean : Milliseconds mean } } -> size /\ mean) bench.samples
-    durs = map (\size -> fromMaybe 0.0 $ Map.lookup size mp) sizes
+  mp = Map.fromFoldable $ map (\{ size, average: Milliseconds average } -> size /\ average) bench.samples
+  durs = map (\size -> fromMaybe 0.0 $ Map.lookup size mp) sizes
 
-getXTicks' ::  Array Size ->  Array BenchResult -> String
-getXTicks' sizes benchs_ = fromMaybe "0" $ do
-  sizes <- NEA.fromArray sizes
-  pure $ Str.joinWith ", " $ map (Int.toStringAs Int.decimal) $ (getXTicks sizes)
+getXTicks' :: Array Size -> String
+getXTicks' sizes = Str.joinWith ", " $ map (Int.toStringAs Int.decimal) sizes
 
 getXTicks :: NonEmptyArray Int -> Array Int
 getXTicks sizes =

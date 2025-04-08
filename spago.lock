@@ -23,6 +23,7 @@
             {
               "datetime": ">=6.1.0 <7.0.0"
             },
+            "debug",
             {
               "effect": ">=4.0.0 <5.0.0"
             },
@@ -101,6 +102,7 @@
             "contravariant",
             "control",
             "datetime",
+            "debug",
             "distributive",
             "effect",
             "either",
@@ -998,6 +1000,15 @@
         "partial",
         "prelude",
         "tuples"
+      ]
+    },
+    "debug": {
+      "type": "registry",
+      "version": "6.0.2",
+      "integrity": "sha256-vmkYFuXYuELBzeauvgHG6E6Kf/Hp1dAnxwE9ByHfwSg=",
+      "dependencies": [
+        "functions",
+        "prelude"
       ]
     },
     "distributive": {

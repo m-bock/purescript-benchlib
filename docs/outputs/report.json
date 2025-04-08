@@ -1,27 +1,27 @@
 {
-  "groups": [
+  "groupResults": [
     {
-      "benchs": [
+      "benchResults": [
         {
           "benchName": "Array",
           "samples": [
             {
-              "duration": 0.002,
+              "average": 0.002356775999999968,
               "iterations": 1000,
               "size": 0
             },
             {
-              "duration": 0.153,
+              "average": 0.139840123,
               "iterations": 1000,
               "size": 20000
             },
             {
-              "duration": 0.342,
+              "average": 0.327235029,
               "iterations": 1000,
               "size": 40000
             },
             {
-              "duration": 0.583,
+              "average": 0.492977569,
               "iterations": 1000,
               "size": 80000
             }
@@ -31,28 +31,30 @@
           "benchName": "Lazy List",
           "samples": [
             {
-              "duration": 0.002,
+              "average": 0.001914119000000028,
               "iterations": 1000,
               "size": 0
             },
             {
-              "duration": 0.001,
+              "average": 0.0030478400000001783,
               "iterations": 1000,
               "size": 20000
             },
             {
-              "duration": 0,
+              "average": 0.0022819429999999556,
               "iterations": 1000,
               "size": 40000
             },
             {
-              "duration": 0.001,
+              "average": 0.0037216289999998935,
               "iterations": 1000,
               "size": 80000
             }
           ]
         }
       ],
+      "checkInputsResults": null,
+      "checkOutputsResults": null,
       "groupName": "Replicate functions"
     }
   ],

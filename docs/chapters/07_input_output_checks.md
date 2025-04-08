@@ -4,7 +4,7 @@
 
 ### Define the benchmark in PureScript
 
-<!-- start:code
+<!-- start:pursCode
 { 
   "file": "test/Test/Samples/MarkdownReporter.purs",
   "section": "Header",
@@ -20,10 +20,9 @@ Source Code: [test/Test/Samples/MarkdownReporter.purs](test/Test/Samples/Markdow
 > module Test.Samples.MarkdownReporter (main) where
 > 
 > import Prelude
-> import BenchLib (benchGroup_, benchSuite, bench_)
+> 
+> import BenchLib (basic, group_, suite, bench_)
 > import BenchLib as BenchLib
-> import BenchLib.Reporters.Html (reportHtml)
-> import BenchLib.Reporters.Json (reportJson)
 > import BenchLib.Reporters.Markdown (reportMarkdown)
 > import Data.Array as Array
 > import Data.List.Lazy as LazyList
@@ -33,31 +32,42 @@ Source Code: [test/Test/Samples/MarkdownReporter.purs](test/Test/Samples/Markdow
 </details>
 <!-- end -->
 
-<!-- start:code
+<!-- start:pursCode
 {"file": "test/Test/Samples/MarkdownReporter.purs", "section": "Main"}
 -->
 
 > ```purescript
-> main :: Effect Unit
-> main = BenchLib.run $
->   benchSuite
->     "Minimal Example"
->     ( \cfg -> cfg
->         { iterations = 1000
->         , sizes = [ 0, 20_000, 40_000, 80_000 ]
->         , reporters = cfg.reporters <> reporters
->         }
->     )
->     [ benchGroup_ "Replicate functions"
->         [ bench_
->             "Array"
->             (\size -> const unit $ Array.replicate size 'x')
+> reporters :: Array BenchLib.Reporter
+> reporters =
+>   [ reportMarkdown \cfg -> cfg
+>       { filePath = "docs/chapters/02_reporters/report.md"
+>       , showHeadline = true
+>       }
+>   ]
 > 
->         , bench_
->             "Lazy List"
->             (\size -> const unit $ LazyList.replicate size 'x')
+> main :: Effect Unit
+> main =
+>   BenchLib.run
+>     ( \cfg -> cfg
+>         { reporters = cfg.reporters <> reporters }
+>     )
+>     $ suite
+>         "Minimal Example"
+>         ( \cfg -> cfg
+>             { iterations = 1000
+>             , sizes = [ 0, 20_000, 40_000, 80_000 ]
+>             }
+>         )
+>         [ group_ "Replicate functions"
+>             [ basic $ bench_
+>                 "Array"
+>                 (\size -> Array.replicate size 'x')
+> 
+>             , basic $ bench_
+>                 "Lazy List"
+>                 (\size -> LazyList.replicate size 'x')
+>             ]
 >         ]
->     ]
 > ```
 <!-- end -->
 
@@ -90,8 +100,8 @@ xychart-beta
   title "Replicate functions"
   x-axis "Input Size" [0, 20000, 40000, 60000, 80000]
   y-axis "Time (in ms)" 0 --> 1
-  line [0.002, 0.144, 0.257, 0.487, 0.002, 0.144, 0.257, 0.487]
-  line [0.005, 0.001, 0.001, 0.003, 0.005, 0.001, 0.001, 0.003]
+  line [0.0063428519999999934, 0.144562617, 0.28676962699999997, 0.40647417099999994, 0.6090606709999999]
+  line [0.0031995150000000195, 0.0027428610000001753, 0.002265244000000166, 0.003438912000000073, 0.0018765710000000126]
 ```
 ![ff3456](https://placehold.co/8x8/ff3456/ff3456.png) Array&nbsp;&nbsp;![00ff00](https://placehold.co/8x8/00ff00/00ff00.png) Lazy List
 <!-- end -->

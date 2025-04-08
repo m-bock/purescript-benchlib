@@ -36,7 +36,7 @@ module Test.Samples.Simple where
 
 import Prelude
 
-import BenchLib (bench, benchGroup_, benchSuite, reportConsole)
+import BenchLib (bench, group_, suite, reportConsole)
 import BenchLib as BenchLib
 import BenchLib.Reporters.Html (reportHtml_)
 import BenchLib.Reporters.Json (reportJson_)
@@ -50,7 +50,7 @@ import Effect (Effect)
 ```purescript
 main :: Effect Unit
 main = BenchLib.run $
-  benchSuite
+  suite
     "Simple Example"
 
     -- set suite options by overriding default config:
@@ -66,7 +66,7 @@ main = BenchLib.run $
             ]
         }
     )
-    [ benchGroup_ "List operations"
+    [ group_ "List operations"
         [ bench
             "Add item to the front of a list"
             -- set benchmark options:

@@ -7,11 +7,11 @@ module BenchLib.Reporters.Json
 
 import Prelude
 
-import BenchLib (BenchResult, GroupResult, Reporter, SampleResult, Stats, SuiteResult, CheckResults, defaultReporter)
+import BenchLib (BenchResult, GroupResult, Reporter, SampleResult, SuiteResult, CheckResults, defaultReporter)
 import Data.Argonaut (stringifyWithIndent)
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
-import Data.Codec.Argonaut.Common as CAC
+import Data.Codec.Argonaut.Compat as CAP
 import Data.Codec.Argonaut.Record as CAR
 import Data.Newtype (unwrap, wrap)
 import Data.Profunctor (dimap)
@@ -44,7 +44,7 @@ reportJson mkOpts =
     defaultReporter
       { onSuiteFinish = \suiteResult -> liftEffect do
           writeTextFile UTF8 opts.filePath $ toJsonStr opts.indent suiteResult
-          Console.error ("Wrote JSON report to " <> opts.filePath)
+          Console.log ("Wrote JSON report to " <> opts.filePath)
       }
 
 toJsonStr :: Int -> SuiteResult -> String
@@ -62,8 +62,8 @@ codecGroupResult :: JsonCodec GroupResult
 codecGroupResult = CAR.object "GroupResult"
   { groupName: CA.string
   , benchResults: CA.array codecBenchResult
-  , checkOutputsResults: CAC.maybe (CA.array codecCheckResults)
-  , checkInputsResults: CAC.maybe (CA.array codecCheckResults)
+  , checkOutputsResults: CAP.maybe (CA.array codecCheckResults)
+  , checkInputsResults: CAP.maybe (CA.array codecCheckResults)
   }
 
 codecBenchResult :: JsonCodec BenchResult
@@ -76,24 +76,15 @@ codecCheckResults :: JsonCodec CheckResults
 codecCheckResults = CAR.object "CheckResults"
   { success: CA.boolean
   , size: CA.int
-  , values: CA.array
+  , results: CA.array
       (CAR.object "CheckResult" { showedVal: CA.string, benchName: CA.string })
   }
 
 codecSampleResult :: JsonCodec SampleResult
 codecSampleResult = CAR.object "SampleResult"
   { size: CA.int
-  , stats: codecStats
+  , average: codecMilliseconds
   , iterations: CA.int
-  }
-
-codecStats :: JsonCodec Stats
-codecStats = CAR.object "Stats"
-  { mean: codecMilliseconds
-  , min: codecMilliseconds
-  , max: codecMilliseconds
-  , stddev: codecMilliseconds
-  , median: codecMilliseconds
   }
 
 codecMilliseconds :: JsonCodec Milliseconds

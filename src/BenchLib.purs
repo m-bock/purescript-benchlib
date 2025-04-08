@@ -12,15 +12,14 @@ module BenchLib
   , SuiteOpts
   , GroupOpts
   , BenchOpts
-  , Stats
   , Reporter
-  , benchSuite
-  , benchGroup
+  , suite
+  , group
   , bench
   , benchM
   , run_
-  , benchSuite_
-  , benchGroup_
+  , suite_
+  , group_
   , benchM_
   , bench_
   , checkAllEq
@@ -38,8 +37,9 @@ import Prelude
 
 import Data.Array (filter, foldr)
 import Data.Array as Array
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Bifunctor (class Bifunctor, bimap)
-import Data.DateTime.Instant (unInstant)
+import Data.DateTime.Instant (Instant, unInstant)
 import Data.Int as Int
 import Data.List.NonEmpty ((!!))
 import Data.List.NonEmpty as NEL
@@ -86,8 +86,8 @@ type SuiteOpts =
 type GroupOpts a b =
   { sizes :: Array Int
   , iterations :: Int
-  , checkInputs :: Maybe ({ values :: Array a, size :: Size } -> Boolean)
-  , checkOutputs :: Maybe ({ values :: Array b, size :: Size } -> Boolean)
+  , checkInputs :: Maybe ({ results :: Array a, size :: Size } -> Boolean)
+  , checkOutputs :: Maybe ({ results :: Array b, size :: Size } -> Boolean)
   }
 
 -- | Options for benchmarks.
@@ -121,7 +121,7 @@ type BenchResult =
 type SampleResult =
   { iterations :: Int
   , size :: Size
-  , stats :: Stats
+  , average :: Milliseconds
   }
 
 --- Opaque types
@@ -189,7 +189,7 @@ type Reporter =
 type CheckResults =
   { success :: Boolean
   , size :: Size
-  , values :: Array { showedVal :: String, benchName :: String }
+  , results :: Array { showedVal :: String, benchName :: String }
   }
 
 --- Internal Types
@@ -265,8 +265,8 @@ mkDefaultBenchOpts { iterations } =
 -- | Create a benchmark suite of a given name.
 -- | The suite will be run with the provided options.
 -- | The suite is a collection of groups, each containing multiple benchmarks.
-benchSuite :: String -> (SuiteOpts -> SuiteOpts) -> Array Group -> Suite
-benchSuite suiteName mkSuiteOpts groups_ = Suite
+suite :: String -> (SuiteOpts -> SuiteOpts) -> Array Group -> Suite
+suite suiteName mkSuiteOpts groups_ = Suite
   { suiteName
   , runSuite: \{ reporter } -> do
       reporter.onSuiteStart suiteName
@@ -315,8 +315,8 @@ mkPerSizeItf groupOpts = liftEffect do
           Just $ map
             ( \(size /\ { outputs }) ->
                 { size
-                , success: checkOutputs { values: map _.value outputs, size }
-                , values: map (\{ benchName, value } -> { benchName, showedVal: show value }) outputs
+                , success: checkOutputs { results: map _.value outputs, size }
+                , results: map (\{ benchName, value } -> { benchName, showedVal: show value }) outputs
                 }
             )
             (Map.toUnfoldable accum)
@@ -329,8 +329,8 @@ mkPerSizeItf groupOpts = liftEffect do
           Just $ map
             ( \(size /\ { inputs }) ->
                 { size
-                , success: checkInputs { values: map _.value inputs, size }
-                , values: map (\{ benchName, value } -> { benchName, showedVal: show value }) inputs
+                , success: checkInputs { results: map _.value inputs, size }
+                , results: map (\{ benchName, value } -> { benchName, showedVal: show value }) inputs
                 }
             )
             (Map.toUnfoldable accum)
@@ -339,8 +339,8 @@ mkPerSizeItf groupOpts = liftEffect do
 -- | Create a benchmark group of a given name.
 -- | The group will be run with the provided options.
 -- | The group is a collection of benchmarks
-benchGroup :: forall @a @b. Show a => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
-benchGroup groupName mkGroupOpts benches_ =
+group :: forall @a @b. Show a => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
+group groupName mkGroupOpts benches_ =
   Group $ notOnly
     { groupName
     , runGroup: \defOpts@{ reporter } -> do
@@ -392,21 +392,19 @@ benchImpl benchName mkBenchOpts benchFn =
 
         let { iterations, prepareInput } = mkBenchOpts $ mkDefaultBenchOpts defOpts
 
-        durations <- replicate1A iterations
-          ( do
-              let input = prepareInput size
+        inputs :: NonEmptyArray _ <- replicate1A iterations (pure $ prepareInput size)
 
-              measureTime \_ ->
-                toAff $ benchFn input
-          )
+        let benchFnAff = toAff <<< benchFn
+
+        duration <- measureTime \_ -> for inputs \input -> benchFnAff input
+
+        let average = Milliseconds (unwrap duration / Int.toNumber iterations)
 
         let input = prepareInput size
 
         output <- toAff $ benchFn input
 
-        let stats = calcStats durations
-
-        let sampleResult = { size, stats, iterations }
+        let sampleResult = { size, average, iterations }
 
         pure { sampleResult, output, input }
     }
@@ -444,8 +442,6 @@ instance MonadBench Aff where
 
 --- API shortcuts
 
-
-
 bench :: forall @a @b. String -> (BenchOpts Size -> BenchOpts a) -> (a -> b) -> Bench a b
 bench name mkOpts benchFn = benchImpl name mkOpts (pure @Effect <<< benchFn)
 
@@ -462,14 +458,14 @@ benchM_ name benchFn = benchM name identity benchFn
 run_ :: Suite -> Effect Unit
 run_ suite = run identity suite
 
--- | Like `benchSuite`, but with default options.
-benchSuite_ :: String -> Array Group -> Suite
-benchSuite_ groupName benchmarks = benchSuite groupName identity benchmarks
+-- | Like `suite`, but with default options.
+suite_ :: String -> Array Group -> Suite
+suite_ groupName benchmarks = suite groupName identity benchmarks
 
--- | Like `benchGroup`, but with default options.
-benchGroup_ :: forall a b. Show a => Show b => String -> Array (Bench a b) -> Group
-benchGroup_ groupName benches = benchGroup groupName identity benches
-
+-- | Like `group`, but with default options.
+group_ :: forall a b. Show a => Show b => String -> Array (Bench a b) -> Group
+group_ groupName benches = group groupName identity benches
+ 
 --- Utils
 
 mayGetOnlies :: forall a. Array (MayOnly a) -> Array a
@@ -485,11 +481,13 @@ notOnly a = MayOnly { only: false, val: a }
 
 measureTime :: forall a m. MonadEffect m => (Unit -> m a) -> m Milliseconds
 measureTime action = do
-  startTime <- liftEffect now
+  startTime <- liftEffect performanceNow
   _ <- action unit
-  endTime <- liftEffect now
+  endTime <- liftEffect performanceNow
   let duration = unwrap (unInstant endTime) - unwrap (unInstant startTime)
   pure (Milliseconds duration)
+
+foreign import performanceNow :: Effect Instant
 
 calcMean :: NonEmptyList Milliseconds -> Milliseconds
 calcMean items = Milliseconds (sum (map coerce items :: NonEmptyList Number) / Int.toNumber (NEL.length items))
@@ -507,7 +505,7 @@ getMiddleVal items =
       if Int.even n then
         items !! (mid - 1)
       else
-        items !! (mid)
+        items !! mid
 
 calcStdDev :: NonEmptyList Milliseconds -> Milliseconds -> Milliseconds
 calcStdDev items (Milliseconds mean) =
@@ -516,26 +514,6 @@ calcStdDev items (Milliseconds mean) =
     variance = sum (map (\(Milliseconds x) -> (x - mean) `Number.pow` 2.0) items) / n
   in
     Milliseconds (Number.sqrt variance)
-
-type Stats =
-  { mean :: Milliseconds
-  , median :: Milliseconds
-  , min :: Milliseconds
-  , max :: Milliseconds
-  , stddev :: Milliseconds
-  }
-
-calcStats :: NonEmptyList Milliseconds -> Stats
-calcStats items =
-  let
-    mean = calcMean items
-  in
-    { mean
-    , median: calcMedian items
-    , min: minimum items
-    , max: maximum items
-    , stddev: calcStdDev items mean
-    }
 
 asciColorStr :: Int -> String -> String
 asciColorStr color str =
@@ -577,15 +555,11 @@ reportConsole = defaultReporter
   , onBenchStart = \benchName -> Console.log
       ("    • " <> (asciColorStr bgGray ("bench: " <> benchName)))
 
-  , onSampleFinish = \{ size, stats, iterations } -> Console.log
+  , onSampleFinish = \{ size, average, iterations } -> Console.log
       ( "      • " <> printStats
           [ "size" /\ Int.toStringAs Int.decimal size
           , "count" /\ Int.toStringAs Int.decimal iterations
-          , "mean" /\ printMs stats.mean
-          , "median" /\ printMs stats.median
-          , "min" /\ printMs stats.min
-          , "max" /\ printMs stats.max
-          , "stddev" /\ printMs stats.stddev
+          , "avg" /\ printMs average
           ]
       )
 

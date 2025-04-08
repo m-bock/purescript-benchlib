@@ -1,27 +1,24 @@
 --- Header
 
-module Test.Samples.MarkdownReporter (main) where
+module Test.Samples.HtmlReporter (main) where
 
 import Prelude
 
 import BenchLib (basic, group_, suite, bench_)
 import BenchLib as BenchLib
-import BenchLib.Reporters.Markdown (reportMarkdown)
+import BenchLib.Reporters.Html (reportHtml)
 import Data.Array as Array
 import Data.List.Lazy as LazyList
 import Effect (Effect)
 
---- Reporters
+--- Main
 
 reporters :: Array BenchLib.Reporter
 reporters =
-  [ reportMarkdown \cfg -> cfg
-      { filePath = "docs/outputs/report.md"
-      , showHeadline = true
+  [ reportHtml \cfg -> cfg
+      { filePath = "docs/outputs/report.html"
       }
   ]
-
---- Main
 
 main :: Effect Unit
 main =
@@ -33,7 +30,7 @@ main =
         "Minimal Example"
         ( \cfg -> cfg
             { iterations = 1000
-            , sizes = [ 0, 20_000, 40_000, 60_000, 80_000 ]
+            , sizes = [ 0, 20_000, 40_000, 80_000 ]
             }
         )
         [ group_
