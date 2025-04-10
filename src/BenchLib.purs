@@ -50,7 +50,6 @@ import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.Number as Number
 import Data.Number.Format as NumFmt
-import Data.Semigroup.Foldable (maximum, minimum)
 import Data.String as Str
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for, sum)
@@ -60,7 +59,6 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console as Console
-import Effect.Now (now)
 import Effect.Ref as Ref
 import Partial.Unsafe (unsafePartial)
 import Prim.TypeError (class Warn, Text)
@@ -139,33 +137,31 @@ newtype Suite = Suite
 
 -- | Opaque type for the benchmark group.
 newtype Group = Group
-  ( MayOnly
-      { groupName :: String
-      , runGroup ::
-          { reporter :: Reporter
-          , iterations :: Int
-          , sizes :: Array Int
-          }
-          -> Aff GroupResult
+  { only :: Boolean
+  , groupName :: String
+  , runGroup ::
+      { reporter :: Reporter
+      , iterations :: Int
+      , sizes :: Array Int
       }
-  )
+      -> Aff GroupResult
+  }
 
 -- | Opaque type for the benchmark.
 newtype Bench a b = Bench
-  ( MayOnly
-      { benchName :: String
-      , runBench ::
-          { iterations :: Int
-          , size :: Size
-          }
-          -> Aff { sampleResult :: SampleResult, input :: a, output :: b }
+  { only :: Boolean
+  , benchName :: String
+  , runBench ::
+      { iterations :: Int
+      , size :: Size
       }
-  )
+      -> Aff { sampleResult :: SampleResult, input :: a, output :: b }
+  }
 
 derive instance Functor (Bench a)
 
 instance Bifunctor Bench where
-  bimap f g (Bench mayOnly) = Bench $ mayOnly # map \rec -> rec
+  bimap f g (Bench rec) = Bench $ rec
     { runBench = \opts -> do
         ret@{ input, output } <- rec.runBench opts
         pure $ ret { input = f input, output = g output }
@@ -197,13 +193,6 @@ type CheckResults =
 type BenchName = String
 
 type GroupName = String
-
-newtype MayOnly a = MayOnly { only :: Boolean, val :: a }
-
-derive instance Functor MayOnly
-
-setOnly :: forall a. Boolean -> MayOnly a -> MayOnly a
-setOnly b (MayOnly r) = MayOnly $ r { only = b }
 
 --- Running the benchmark suite
 
@@ -272,9 +261,9 @@ suite suiteName mkSuiteOpts groups_ = Suite
       reporter.onSuiteStart suiteName
 
       let { iterations, sizes } = mkSuiteOpts defaultSuiteOpts
-      let groups = mayGetOnlies (map (\(Group g) -> g) groups_)
+      let groups = mayGetOnlies groups_
 
-      groupResults <- for groups \{ runGroup } ->
+      groupResults <- for groups \(Group { runGroup }) ->
         ( do
             groupResult <- runGroup { reporter, iterations, sizes }
 
@@ -341,20 +330,21 @@ mkPerSizeItf groupOpts = liftEffect do
 -- | The group is a collection of benchmarks
 group :: forall @a @b. Show a => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
 group groupName mkGroupOpts benches_ =
-  Group $ notOnly
+  Group
     { groupName
+    , only: false
     , runGroup: \defOpts@{ reporter } -> do
         reporter.onGroupStart groupName
 
         let
           groupOpts@{ sizes, iterations } = mkGroupOpts $ mkDefaultGroupOpts defOpts
 
-        let benches = mayGetOnlies $ map (\(Bench b) -> b) benches_
+        let benches = mayGetOnlies benches_
 
         perSizeItf <- mkPerSizeItf groupOpts
 
         benchResults <- for benches
-          ( \{ benchName, runBench } -> do
+          ( \(Bench { benchName, runBench }) -> do
               reporter.onBenchStart benchName
               samples <- for sizes
                 ( \size -> do
@@ -386,8 +376,9 @@ group groupName mkGroupOpts benches_ =
 
 benchImpl :: forall m a b. MonadBench m => String -> (BenchOpts Size -> BenchOpts a) -> (a -> m b) -> Bench a b
 benchImpl benchName mkBenchOpts benchFn =
-  Bench $ notOnly
+  Bench
     { benchName
+    , only: false
     , runBench: \defOpts@{ size } -> do
 
         let { iterations, prepareInput } = mkBenchOpts $ mkDefaultBenchOpts defOpts
@@ -423,10 +414,19 @@ class CanRunOnly a where
   only :: Warn (Text "`only` usage") => a -> a
 
 instance CanRunOnly (Bench a b) where
-  only (Bench mayOnly) = Bench $ setOnly true mayOnly
+  only (Bench rec) = Bench $ rec { only = true }
 
 instance CanRunOnly Group where
-  only (Group mayOnly) = Group $ setOnly true mayOnly
+  only (Group rec) = Group $ rec { only = true }
+
+class IsOnly a where
+  isOnly :: a -> Boolean
+
+instance IsOnly (Bench a b) where
+  isOnly (Bench rec) = rec.only
+
+instance IsOnly Group where
+  isOnly (Group rec) = rec.only
 
 -- | A class for monadic benchmarks.
 -- | It allows to run benchmarks in different monads as long as they are capable of
@@ -465,19 +465,15 @@ suite_ groupName benchmarks = suite groupName identity benchmarks
 -- | Like `group`, but with default options.
 group_ :: forall a b. Show a => Show b => String -> Array (Bench a b) -> Group
 group_ groupName benches = group groupName identity benches
- 
+
 --- Utils
 
-mayGetOnlies :: forall a. Array (MayOnly a) -> Array a
-mayGetOnlies mayOnlies_ =
+mayGetOnlies :: forall a. IsOnly a => Array a -> Array a
+mayGetOnlies mayOnlies =
   let
-    mayOnlies = map (\(MayOnly mo) -> mo) mayOnlies_
-    onlys = filter _.only mayOnlies
+    onlys = filter isOnly mayOnlies
   in
-    map _.val $ if Array.null onlys then mayOnlies else onlys
-
-notOnly :: forall a. a -> MayOnly a
-notOnly a = MayOnly { only: false, val: a }
+    if Array.null onlys then mayOnlies else onlys
 
 measureTime :: forall a m. MonadEffect m => (Unit -> m a) -> m Milliseconds
 measureTime action = do
