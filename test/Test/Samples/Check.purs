@@ -2,7 +2,7 @@ module Test.Samples.Check where
 
 import Prelude
 
-import BenchLib (bench, group, suite_)
+import BenchLib (bench, group, normalize, suite_)
 import BenchLib as BenchLib
 import Data.Array as Array
 import Data.Bifunctor (bimap)
@@ -34,43 +34,36 @@ main =
               }
 
           )
-          [ ( bench
-                "List"
-                ( \cfg -> cfg
-                    { prepareInput = \(size :: Int) -> range 0 size
-                    }
-                )
-                (\(items :: List Int) -> List.reverse items)
-            )
-              # bimap List.toUnfoldable List.toUnfoldable
+          [ normalize List.toUnfoldable List.toUnfoldable $ bench
+              "List"
+              ( \cfg -> cfg
+                  { prepareInput = \(size :: Int) -> range 0 size
+                  }
+              )
+              (\(items :: List Int) -> List.reverse items)
 
-          , ( bench
-                "NonEmptyList"
-                ( \cfg -> cfg
-                    { prepareInput = \(size :: Int) -> range 0 size
-                    }
-                )
-                (\(items :: NonEmptyList Int) -> NEL.reverse items)
-            )
-              # bimap NEL.toUnfoldable NEL.toUnfoldable
+          , normalize NEL.toUnfoldable NEL.toUnfoldable $ bench
+              "NonEmptyList"
+              ( \cfg -> cfg
+                  { prepareInput = \(size :: Int) -> range 0 size
+                  }
+              )
+              (\(items :: NonEmptyList Int) -> NEL.reverse items)
 
-          , ( bench
-                "Lazy List"
-                ( \cfg -> cfg
-                    { prepareInput = \(size :: Int) -> range 0 size
-                    }
-                )
-                (\(items :: Lazy.List Int) -> LazyList.reverse items)
-            )
-              # bimap LazyList.toUnfoldable LazyList.toUnfoldable
+          , normalize LazyList.toUnfoldable LazyList.toUnfoldable $ bench
+              "Lazy List"
+              ( \cfg -> cfg
+                  { prepareInput = \(size :: Int) -> range 0 size
+                  }
+              )
+              (\(items :: Lazy.List Int) -> LazyList.reverse items)
 
-          , ( bench
-                "Array"
-                ( \cfg -> cfg
-                    { prepareInput = \(size :: Int) -> range 0 size
-                    }
-                )
-                (\(items :: Array Int) -> Array.reverse items)
-            )
+          , bench
+              "Array"
+              ( \cfg -> cfg
+                  { prepareInput = \(size :: Int) -> range 0 size
+                  }
+              )
+              (\(items :: Array Int) -> Array.reverse items)
           ]
       ]
