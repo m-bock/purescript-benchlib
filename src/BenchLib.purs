@@ -458,17 +458,17 @@ bench name mkOpts benchFn = benchImpl name mkOpts' (pure @Effect <<< benchFn)
   mkOpts' :: BenchOptsPure Size -> BenchOptsM Effect a
   mkOpts' optsPure = benchOptsPureToM $ mkOpts optsPure
 
-bench_ :: forall b. Eq b => String -> (Size -> b) -> Bench Size b
+bench_ :: forall b. String -> (Size -> b) -> Bench Size b
 bench_ name benchFn = bench name identity benchFn
 
-benchM :: forall m a b. MonadBench m => Eq b => String -> (BenchOptsM m Size -> BenchOptsM m a) -> (a -> m b) -> Bench a b
+benchM :: forall m a b. MonadBench m => String -> (BenchOptsM m Size -> BenchOptsM m a) -> (a -> m b) -> Bench a b
 benchM name mkOpts benchFn = benchImpl name mkOpts' benchFn
   where
   mkOpts' :: BenchOptsPure Size -> BenchOptsM m a
   mkOpts' optsPure = mkOpts $ benchOptsPureToM optsPure
 
 -- | Like `benchM`, but with default options.
-benchM_ :: forall m b. MonadBench m => Eq b => String -> (Size -> m b) -> Bench Size b
+benchM_ :: forall m b. MonadBench m => String -> (Size -> m b) -> Bench Size b
 benchM_ name benchFn = benchM name identity benchFn
 
 run_ :: Suite -> Effect Unit
