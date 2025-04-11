@@ -44,7 +44,6 @@ import Data.Array (filter, foldr)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.DateTime.Instant (unInstant)
-import Data.Identity (Identity(..))
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
@@ -335,7 +334,7 @@ mkPerSizeItf groupOpts = liftEffect do
 -- | Create a benchmark group of a given name.
 -- | The group will be run with the provided options.
 -- | The group is a collection of benchmarks
-group :: forall @a @b m. Show a => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
+group :: forall @a @b. Show a => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
 group groupName mkGroupOpts benches_ =
   Group
     { groupName
