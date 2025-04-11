@@ -5,7 +5,6 @@ import Prelude
 import BenchLib (bench, group, normalize, suite_)
 import BenchLib as BenchLib
 import Data.Array as Array
-import Data.Bifunctor (bimap)
 import Data.Foldable (all)
 import Data.List (List)
 import Data.List as List
@@ -27,10 +26,10 @@ main =
           "Reverse collection"
           ( \cfg -> cfg
               { checkInputs = Just \{ results, size } ->
-                  all (\result -> result == range 0 size) results
+                  all (\result -> result == range 0 size) (results :: Array _)
 
               , checkOutputs = Just \{ results, size } ->
-                  all (\result -> result == Array.reverse (range 0 size)) results
+                  all (\result -> result == Array.reverse (range 0 size)) (results :: Array _)
               }
 
           )

@@ -31,8 +31,6 @@ module BenchLib
   , normalizeInput
   , normalizeOutput
   , checkAllEq
-  , class MonadBench
-  , toAff
   , class CanRunOnly
   , only
   , defaultReporter
@@ -158,17 +156,17 @@ newtype Group = Group
   }
 
 -- | Opaque type for the benchmark.
-newtype Bench (m :: Type -> Type) a b = Bench
+newtype Bench a b = Bench
   { only :: Boolean
   , benchName :: String
   , runBench ::
       { iterations :: Int
       , size :: Size
       }
-      -> Aff { sampleResult :: SampleResult, input :: m a, output :: m b }
+      -> Aff { sampleResult :: SampleResult, input :: Aff a, output :: Aff b }
   }
 
-derive instance Functor m => Functor (Bench m a)
+derive instance Functor (Bench a)
 
 --- Reporter types
 
@@ -252,7 +250,7 @@ mkDefaultBenchOptsPure { iterations } =
   , prepareInput: \size -> size -- TODO: mk effectful
   }
 
-benchOptsPureToM :: forall m a. Applicative m => BenchOptsPure a -> BenchOptsM m a
+benchOptsPureToM :: forall a. BenchOptsPure a -> BenchOptsM Aff a
 benchOptsPureToM { iterations, prepareInput } =
   { iterations
   , prepareInput: prepareInput >>> pure
@@ -337,7 +335,7 @@ mkPerSizeItf groupOpts = liftEffect do
 -- | Create a benchmark group of a given name.
 -- | The group will be run with the provided options.
 -- | The group is a collection of benchmarks
-group :: forall @a @b m. MonadBench m => Show a => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench m a b) -> Group
+group :: forall @a @b m. Show a => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
 group groupName mkGroupOpts benches_ =
   Group
     { groupName
@@ -361,8 +359,8 @@ group groupName mkGroupOpts benches_ =
 
                     { sampleResult, output, input } <- runBench { iterations, size }
 
-                    output <- toAff output
-                    input <- toAff input
+                    output <- output
+                    input <- input
 
                     perSizeItf.addEntry { size, benchName, output, input }
 
@@ -386,7 +384,7 @@ group groupName mkGroupOpts benches_ =
         pure groupResult
     }
 
-benchImpl :: forall m a b. MonadBench m => String -> (BenchOptsPure Size -> BenchOptsM m a) -> (a -> m b) -> Bench m a b
+benchImpl :: forall a b. String -> (BenchOptsPure Size -> BenchOptsM Aff a) -> (a -> Aff b) -> Bench a b
 benchImpl benchName mkBenchOpts benchFn =
   Bench
     { benchName
@@ -395,17 +393,15 @@ benchImpl benchName mkBenchOpts benchFn =
 
         let { iterations, prepareInput } = mkBenchOpts $ mkDefaultBenchOptsPure defOpts
 
-        inputs :: NonEmptyArray _ <- replicate1A iterations (toAff $ prepareInput size)
+        inputs :: NonEmptyArray _ <- replicate1A iterations (prepareInput size)
 
-        let benchFnAff = toAff <<< benchFn
-
-        duration <- measureTime \_ -> for inputs \input -> benchFnAff input
+        duration <- measureTime \_ -> for inputs \input -> benchFn input
 
         let average = Milliseconds (unwrap duration / Int.toNumber iterations)
 
-        input <- toAff $ prepareInput size
+        input <- prepareInput size
 
-        output <- toAff $ benchFn input
+        output <- benchFn input
 
         let sampleResult = { size, average, iterations }
 
@@ -419,29 +415,29 @@ type ResultPerSize a b =
 
 -- Normalization
 
-normalizeM :: forall m a a' b b'. Monad m => (a -> m a') -> (b -> m b') -> Bench m a b -> Bench m a' b'
+normalizeM :: forall a a' b b'. (a -> Aff a') -> (b -> Aff b') -> Bench a b -> Bench a' b'
 normalizeM normIn normOut (Bench rec) = Bench $ rec
   { runBench = \opts -> do
       ret@{ input, output } <- rec.runBench opts
       pure $ ret { input = input >>= normIn, output = output >>= normOut }
   }
 
-normalize :: forall m a a' b b'. MonadBench m => (a -> a') -> (b -> b') -> Bench m a b -> Bench m a' b'
+normalize :: forall a a' b b'. (a -> a') -> (b -> b') -> Bench a b -> Bench a' b'
 normalize normIn normOut = normalizeM (pure <<< normIn) (pure <<< normOut)
 
-normalizeInputM :: forall m a a' b. Monad m => (a -> m a') -> Bench m a b -> Bench m a' b
+normalizeInputM :: forall a a' b. (a -> Aff a') -> Bench a b -> Bench a' b
 normalizeInputM norm = normalizeM norm pure
 
-normalizeOutputM :: forall m a b b'. Monad m => (b -> m b') -> Bench m a b -> Bench m a b'
+normalizeOutputM :: forall a b b'. (b -> Aff b') -> Bench a b -> Bench a b'
 normalizeOutputM norm = normalizeM pure norm
 
-normalizeInput :: forall m a a' b. MonadBench m => (a -> a') -> Bench m a b -> Bench m a' b
+normalizeInput :: forall a a' b. (a -> a') -> Bench a b -> Bench a' b
 normalizeInput norm = normalize norm identity
 
-normalizeOutput :: forall m a b b'. MonadBench m => (b -> b') -> Bench m a b -> Bench m a b'
+normalizeOutput :: forall a b b'. (b -> b') -> Bench a b -> Bench a b'
 normalizeOutput norm = normalize identity norm
 
-basic :: forall m a b. Monad m => Bench m a b -> Bench m Unit Unit
+basic :: forall a b. Bench a b -> Bench Unit Unit
 basic = normalizeM (const $ pure unit) (const $ pure unit)
 
 --- Typeclasses
@@ -452,7 +448,7 @@ basic = normalizeM (const $ pure unit) (const $ pure unit)
 class CanRunOnly a where
   only :: Warn (Text "`only` usage") => a -> a
 
-instance CanRunOnly (Bench m a b) where
+instance CanRunOnly (Bench a b) where
   only (Bench rec) = Bench $ rec { only = true }
 
 instance CanRunOnly Group where
@@ -461,46 +457,31 @@ instance CanRunOnly Group where
 class IsOnly a where
   isOnly :: a -> Boolean
 
-instance IsOnly (Bench m a b) where
+instance IsOnly (Bench a b) where
   isOnly (Bench rec) = rec.only
 
 instance IsOnly Group where
   isOnly (Group rec) = rec.only
 
--- | A class for monadic benchmarks.
--- | It allows to run benchmarks in different monads as long as they are capable of
--- | getting turned into an Aff monad.
-class Monad m <= MonadBench m where
-  toAff :: forall a. m a -> Aff a
-
-instance MonadBench Effect where
-  toAff = liftEffect
-
-instance MonadBench Aff where
-  toAff = identity
-
-instance MonadBench Identity where
-  toAff (Identity val) = pure val
-
 --- API shortcuts
 
-bench :: forall @a @b. String -> (BenchOptsPure Size -> BenchOptsPure a) -> (a -> b) -> Bench Identity a b
+bench :: forall a b. String -> (BenchOptsPure Size -> BenchOptsPure a) -> (a -> b) -> Bench a b
 bench name mkOpts benchFn = benchImpl name mkOpts' (pure <<< benchFn)
   where
-  mkOpts' :: BenchOptsPure Size -> BenchOptsM Identity a
+  mkOpts' :: BenchOptsPure Size -> BenchOptsM Aff a
   mkOpts' optsPure = benchOptsPureToM $ mkOpts optsPure
 
-bench_ :: forall b. String -> (Size -> b) -> Bench Identity Size b
+bench_ :: forall b. String -> (Size -> b) -> Bench Size b
 bench_ name benchFn = bench name identity benchFn
 
-benchM :: forall m a b. MonadBench m => String -> (BenchOptsM m Size -> BenchOptsM m a) -> (a -> m b) -> Bench m a b
+benchM :: forall a b. String -> (BenchOptsM Aff Size -> BenchOptsM Aff a) -> (a -> Aff b) -> Bench a b
 benchM name mkOpts benchFn = benchImpl name mkOpts' benchFn
   where
-  mkOpts' :: BenchOptsPure Size -> BenchOptsM m a
+  mkOpts' :: BenchOptsPure Size -> BenchOptsM Aff a
   mkOpts' optsPure = mkOpts $ benchOptsPureToM optsPure
 
 -- | Like `benchM`, but with default options.
-benchM_ :: forall m b. MonadBench m => String -> (Size -> m b) -> Bench m Size b
+benchM_ :: forall b. String -> (Size -> Aff b) -> Bench Size b
 benchM_ name benchFn = benchM name identity benchFn
 
 run_ :: Suite -> Effect Unit
@@ -511,7 +492,7 @@ suite_ :: String -> Array Group -> Suite
 suite_ groupName benchmarks = suite groupName identity benchmarks
 
 -- | Like `group`, but with default options.
-group_ :: forall a b. Show a => Show b => String -> Array (Bench Identity a b) -> Group
+group_ :: forall a b. Show a => Show b => String -> Array (Bench a b) -> Group
 group_ groupName benches = group groupName identity benches
 
 --- Utils
