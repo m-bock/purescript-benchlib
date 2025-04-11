@@ -2,7 +2,7 @@
 
 <img src="docs/logo.png" width="400"/>
 
-A simple and flexible benchmarking library for PureScript, designed to help you measure performance with ease. 
+A simple and flexible benchmarking library for PureScript. 
 
 ## Features
 
