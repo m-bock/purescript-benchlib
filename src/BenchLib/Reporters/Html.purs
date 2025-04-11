@@ -323,10 +323,12 @@ template = """
                 y: {
                   max: (ctx) => {
                     const maxValue = Math.max(
-                      ...ctx.chart.data.datasets.flatMap((ds) => ds.data)
+                      ...ctx.chart.data.datasets.flatMap((ds) => ds.data.map((d) => d.y))
                     );
+                    console.log(ctx.chart.data.datasets);
                     return Math.max(maxValue, 10);
                   },
+                  min: 0,
                   title: {
                     display: true,
 
