@@ -57,7 +57,7 @@ main = BenchLib.run_ $
 
 ```
 
-### 2. Run the benchmarks from terminal
+### 2. Run Benchmarks from Terminal
 
 After defining your benchmarks, you can run them from the terminal using `spago`:
 

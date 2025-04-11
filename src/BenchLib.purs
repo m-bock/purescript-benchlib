@@ -11,7 +11,8 @@ module BenchLib
   , RunOpts
   , SuiteOpts
   , GroupOpts
-  , BenchOpts
+  , BenchOptsPure
+  , BenchOptsM
   , Reporter
   , suite
   , group
@@ -41,18 +42,14 @@ import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Bifunctor (class Bifunctor, bimap)
 import Data.DateTime.Instant (Instant, unInstant)
 import Data.Int as Int
-import Data.List.NonEmpty ((!!))
-import Data.List.NonEmpty as NEL
-import Data.List.Types (NonEmptyList)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Data.Number as Number
 import Data.Number.Format as NumFmt
 import Data.String as Str
 import Data.Time.Duration (Milliseconds(..))
-import Data.Traversable (for, sum)
+import Data.Traversable (for)
 import Data.Tuple.Nested (type (/\), (/\))
 import Data.Unfoldable1 (replicate1A)
 import Effect (Effect)
@@ -60,9 +57,7 @@ import Effect.Aff (Aff, launchAff_)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console as Console
 import Effect.Ref as Ref
-import Partial.Unsafe (unsafePartial)
 import Prim.TypeError (class Warn, Text)
-import Safe.Coerce (coerce)
 
 --- Type Aliases
 
@@ -89,10 +84,16 @@ type GroupOpts a b =
   , checkOutputs :: Maybe ({ results :: Array b, size :: Size } -> Boolean)
   }
 
--- | Options for benchmarks.
-type BenchOpts a =
+-- | Options for pure benchmarks.
+type BenchOptsPure a =
   { iterations :: Int
   , prepareInput :: Size -> a
+  }
+
+-- | Options for monadic benchmarks.
+type BenchOptsM (m :: Type -> Type) a =
+  { iterations :: Int
+  , prepareInput :: Size -> m a
   }
 
 --- Result Types
@@ -200,7 +201,7 @@ type GroupName = String
 
 -- | Run the benchmark suite.
 run :: (RunOpts -> RunOpts) -> Suite -> Effect Unit
-run mkRunOpts (Suite { runSuite, suiteName }) = launchAff_ do
+run mkRunOpts (Suite { runSuite }) = launchAff_ do
   let
     { reporters } = mkRunOpts defaultRunOpts
 
@@ -245,10 +246,16 @@ mkDefaultGroupOpts { sizes, iterations } =
   , checkOutputs: Nothing
   }
 
-mkDefaultBenchOpts :: forall r. { iterations :: Int | r } -> BenchOpts Size
-mkDefaultBenchOpts { iterations } =
+mkDefaultBenchOptsPure :: forall r. { iterations :: Int | r } -> BenchOptsPure Size
+mkDefaultBenchOptsPure { iterations } =
   { iterations
   , prepareInput: \size -> size -- TODO: mk effectful
+  }
+
+benchOptsPureToM :: forall m a. Applicative m => BenchOptsPure a -> BenchOptsM m a
+benchOptsPureToM { iterations, prepareInput } =
+  { iterations
+  , prepareInput: prepareInput >>> pure
   }
 
 --- Core functions
@@ -376,16 +383,16 @@ group groupName mkGroupOpts benches_ =
         pure groupResult
     }
 
-benchImpl :: forall m a b. MonadBench m => String -> (BenchOpts Size -> BenchOpts a) -> (a -> m b) -> Bench a b
+benchImpl :: forall m a b. MonadBench m => String -> (BenchOptsPure Size -> BenchOptsM m a) -> (a -> m b) -> Bench a b
 benchImpl benchName mkBenchOpts benchFn =
   Bench
     { benchName
     , only: false
     , runBench: \defOpts@{ size } -> do
 
-        let { iterations, prepareInput } = mkBenchOpts $ mkDefaultBenchOpts defOpts
+        let { iterations, prepareInput } = mkBenchOpts $ mkDefaultBenchOptsPure defOpts
 
-        inputs :: NonEmptyArray _ <- replicate1A iterations (pure $ prepareInput size)
+        inputs :: NonEmptyArray _ <- replicate1A iterations (toAff $ prepareInput size)
 
         let benchFnAff = toAff <<< benchFn
 
@@ -393,7 +400,7 @@ benchImpl benchName mkBenchOpts benchFn =
 
         let average = Milliseconds (unwrap duration / Int.toNumber iterations)
 
-        let input = prepareInput size
+        input <- toAff $ prepareInput size
 
         output <- toAff $ benchFn input
 
@@ -444,21 +451,27 @@ instance MonadBench Aff where
 
 --- API shortcuts
 
-bench :: forall @a @b. String -> (BenchOpts Size -> BenchOpts a) -> (a -> b) -> Bench a b
-bench name mkOpts benchFn = benchImpl name mkOpts (pure @Effect <<< benchFn)
+bench :: forall @a @b. String -> (BenchOptsPure Size -> BenchOptsPure a) -> (a -> b) -> Bench a b
+bench name mkOpts benchFn = benchImpl name mkOpts' (pure @Effect <<< benchFn)
+  where
+  mkOpts' :: BenchOptsPure Size -> BenchOptsM Effect a
+  mkOpts' optsPure = benchOptsPureToM $ mkOpts optsPure
 
 bench_ :: forall b. Eq b => String -> (Size -> b) -> Bench Size b
 bench_ name benchFn = bench name identity benchFn
 
-benchM :: forall m a b. MonadBench m => Eq b => String -> (BenchOpts Size -> BenchOpts a) -> (a -> m b) -> Bench a b
-benchM name mkOpts benchFn = benchImpl name mkOpts benchFn
+benchM :: forall m a b. MonadBench m => Eq b => String -> (BenchOptsM m Size -> BenchOptsM m a) -> (a -> m b) -> Bench a b
+benchM name mkOpts benchFn = benchImpl name mkOpts' benchFn
+  where
+  mkOpts' :: BenchOptsPure Size -> BenchOptsM m a
+  mkOpts' optsPure = mkOpts $ benchOptsPureToM optsPure
 
 -- | Like `benchM`, but with default options.
 benchM_ :: forall m b. MonadBench m => Eq b => String -> (Size -> m b) -> Bench Size b
 benchM_ name benchFn = benchM name identity benchFn
 
 run_ :: Suite -> Effect Unit
-run_ suite = run identity suite
+run_ = run identity
 
 -- | Like `suite`, but with default options.
 suite_ :: String -> Array Group -> Suite
