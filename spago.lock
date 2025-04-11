@@ -15,6 +15,9 @@
               "arrays": ">=7.3.0 <8.0.0"
             },
             {
+              "bifunctors": ">=6.0.0 <7.0.0"
+            },
+            {
               "codec-argonaut": ">=10.0.0 <11.0.0"
             },
             {
@@ -23,19 +26,14 @@
             {
               "datetime": ">=6.1.0 <7.0.0"
             },
-            "debug",
             {
               "effect": ">=4.0.0 <5.0.0"
             },
-            "exists",
             {
               "foldable-traversable": ">=6.0.0 <7.0.0"
             },
             {
               "integers": ">=6.0.0 <7.0.0"
-            },
-            {
-              "lists": ">=7.0.0 <8.0.0"
             },
             {
               "maybe": ">=6.0.0 <7.0.0"
@@ -53,7 +51,13 @@
               "node-path": ">=5.0.1 <6.0.0"
             },
             {
+              "node-process": ">=11.2.0 <12.0.0"
+            },
+            {
               "now": ">=6.0.0 <7.0.0"
+            },
+            {
+              "numbers": ">=9.0.1 <10.0.0"
             },
             {
               "ordered-collections": ">=3.2.0 <4.0.0"
@@ -65,19 +69,10 @@
               "profunctor": ">=6.0.1 <7.0.0"
             },
             {
-              "record": ">=4.0.0 <5.0.0"
-            },
-            {
               "refs": ">=6.0.0 <7.0.0"
             },
             {
-              "safe-coerce": ">=2.0.0 <3.0.0"
-            },
-            {
               "strings": ">=6.0.1 <7.0.0"
-            },
-            {
-              "transformers": ">=6.1.0 <7.0.0"
             },
             {
               "tuples": ">=7.0.0 <8.0.0"
@@ -102,7 +97,6 @@
             "contravariant",
             "control",
             "datetime",
-            "debug",
             "distributive",
             "effect",
             "either",
@@ -127,6 +121,7 @@
             "node-event-emitter",
             "node-fs",
             "node-path",
+            "node-process",
             "node-streams",
             "nonempty",
             "now",
@@ -136,6 +131,7 @@
             "orders",
             "parallel",
             "partial",
+            "posix-types",
             "prelude",
             "profunctor",
             "profunctor-lenses",
@@ -158,6 +154,7 @@
           "dependencies": [
             "console",
             "effect",
+            "lists",
             "node-process",
             "spec"
           ],
@@ -1000,15 +997,6 @@
         "partial",
         "prelude",
         "tuples"
-      ]
-    },
-    "debug": {
-      "type": "registry",
-      "version": "6.0.2",
-      "integrity": "sha256-vmkYFuXYuELBzeauvgHG6E6Kf/Hp1dAnxwE9ByHfwSg=",
-      "dependencies": [
-        "functions",
-        "prelude"
       ]
     },
     "distributive": {

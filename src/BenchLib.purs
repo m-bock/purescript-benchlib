@@ -40,7 +40,7 @@ import Data.Array (filter, foldr)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Bifunctor (class Bifunctor, bimap)
-import Data.DateTime.Instant (Instant, unInstant)
+import Data.DateTime.Instant (unInstant)
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
@@ -56,6 +56,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console as Console
+import Effect.Now (now)
 import Effect.Ref as Ref
 import Prim.TypeError (class Warn, Text)
 
@@ -492,13 +493,11 @@ mayGetOnlies mayOnlies =
 
 measureTime :: forall a m. MonadEffect m => (Unit -> m a) -> m Milliseconds
 measureTime action = do
-  startTime <- liftEffect performanceNow
+  startTime <- liftEffect now
   _ <- action unit
-  endTime <- liftEffect performanceNow
+  endTime <- liftEffect now
   let duration = unwrap (unInstant endTime) - unwrap (unInstant startTime)
   pure (Milliseconds duration)
-
-foreign import performanceNow :: Effect Instant
 
 asciColorStr :: Int -> String -> String
 asciColorStr color str =
