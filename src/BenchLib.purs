@@ -23,6 +23,9 @@ module BenchLib
   , group_
   , benchM_
   , bench_
+  , basic
+  , normalizeM
+  , normalize
   , normalizeInputM
   , normalizeOutputM
   , normalizeInput
@@ -35,7 +38,6 @@ module BenchLib
   , defaultReporter
   , reportConsole
   , run
-  -- , basic
   ) where
 
 import Prelude
@@ -43,7 +45,6 @@ import Prelude
 import Data.Array (filter, foldr)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
-import Data.Bifunctor (class Bifunctor, bimap)
 import Data.DateTime.Instant (unInstant)
 import Data.Identity (Identity(..))
 import Data.Int as Int
@@ -440,8 +441,8 @@ normalizeInput norm = normalize norm identity
 normalizeOutput :: forall m a b b'. MonadBench m => (b -> b') -> Bench m a b -> Bench m a b'
 normalizeOutput norm = normalize identity norm
 
-normalizeVoid :: forall m a b. Monad m => Bench m a b -> Bench m Unit Unit
-normalizeVoid = normalizeM (const $ pure unit) (const $ pure unit)
+basic :: forall m a b. Monad m => Bench m a b -> Bench m Unit Unit
+basic = normalizeM (const $ pure unit) (const $ pure unit)
 
 --- Typeclasses
 
