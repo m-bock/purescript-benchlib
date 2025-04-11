@@ -16,7 +16,6 @@ package:
     - node-buffer: ">=9.0.0 <10.0.0"
     - node-fs: ">=9.2.0 <10.0.0"
     - node-path: ">=5.0.1 <6.0.0"
-    - node-process: ">=11.2.0 <12.0.0"
     - now: ">=6.0.0 <7.0.0"
     - numbers: ">=9.0.1 <10.0.0"
     - ordered-collections: ">=3.2.0 <4.0.0"

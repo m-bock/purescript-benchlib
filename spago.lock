@@ -51,9 +51,6 @@
               "node-path": ">=5.0.1 <6.0.0"
             },
             {
-              "node-process": ">=11.2.0 <12.0.0"
-            },
-            {
               "now": ">=6.0.0 <7.0.0"
             },
             {
@@ -121,7 +118,6 @@
             "node-event-emitter",
             "node-fs",
             "node-path",
-            "node-process",
             "node-streams",
             "nonempty",
             "now",
@@ -131,7 +127,6 @@
             "orders",
             "parallel",
             "partial",
-            "posix-types",
             "prelude",
             "profunctor",
             "profunctor-lenses",
