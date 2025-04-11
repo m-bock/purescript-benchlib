@@ -28,24 +28,6 @@ Focus on writing benchmarks, not boilerplate.
 ## Example to Get You Started
 
 ### 1 . Define Benchmarks in PureScript
-<details>
-  <summary>Expand to see module header and imports</summary>
-
-```purescript
-module Test.Samples.Simple where
-
-import Prelude
-
-import BenchLib (bench, group_, suite, reportConsole)
-import BenchLib as BenchLib
-import BenchLib.Reporters.Html (reportHtml_)
-import BenchLib.Reporters.Json (reportJson_)
-import Data.List as List
-import Effect (Effect)
-```
-
-</details>
-
 
 ```purescript
 module Test.Samples.Minimal where
@@ -80,5 +62,5 @@ main = BenchLib.run_ $
 After defining your benchmarks, you can run them from the terminal using `spago`:
 
 ```bash
-spago run -m Test.Samples.Simple
+spago run -m Test.Samples.Minimal
 ```
