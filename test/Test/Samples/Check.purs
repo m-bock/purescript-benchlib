@@ -2,12 +2,10 @@ module Test.Samples.Check where
 
 import Prelude
 
-import BenchLib (basic, bench, group, group_, reportConsole, suite, suite_)
+import BenchLib (bench, group, suite_)
 import BenchLib as BenchLib
-import BenchLib.Reporters.Html (reportHtml_)
-import BenchLib.Reporters.Json (reportJson_)
 import Data.Array as Array
-import Data.Bifunctor (bimap, lmap)
+import Data.Bifunctor (bimap)
 import Data.Foldable (all)
 import Data.List (List)
 import Data.List as List
@@ -16,22 +14,14 @@ import Data.List.Lazy as LazyList
 import Data.List.NonEmpty as NEL
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..))
-import Data.Unfoldable (range, replicate)
+import Data.Unfoldable (range)
 import Effect (Effect)
 
 main :: Effect Unit
 main =
-  BenchLib.run
-    ( \cfg -> cfg
-        { reporters =
-            [ reportConsole -- Simply logs benchmarks to the console
-            , reportJson_ -- Writes benchmarks to JSON file
-            , reportHtml_ -- Writes benchmarks to HTML file
-            ]
-        }
-    ) $
+  BenchLib.run_ $
     suite_
-      "Simple Example"
+      "Sample"
 
       [ group
           "Reverse collection"
@@ -53,7 +43,6 @@ main =
                 (\(items :: List Int) -> List.reverse items)
             )
               # bimap List.toUnfoldable List.toUnfoldable
-              -- # updateCfg (\cfg ->)
 
           , ( bench
                 "NonEmptyList"
@@ -82,5 +71,6 @@ main =
                     }
                 )
                 (\(items :: Array Int) -> Array.reverse items)
-            )]
+            )
+          ]
       ]

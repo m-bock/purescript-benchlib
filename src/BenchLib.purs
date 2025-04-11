@@ -70,6 +70,7 @@ type Size = Int
 
 --- Option Types
 
+-- | Options to run benchmark suites.
 type RunOpts =
   { reporters :: Array Reporter
   }
@@ -116,6 +117,7 @@ type BenchResult =
   , samples :: Array SampleResult
   }
 
+-- | The result of one benchmark sample.
 type SampleResult =
   { iterations :: Int
   , size :: Size
@@ -484,32 +486,6 @@ measureTime action = do
   pure (Milliseconds duration)
 
 foreign import performanceNow :: Effect Instant
-
-calcMean :: NonEmptyList Milliseconds -> Milliseconds
-calcMean items = Milliseconds (sum (map coerce items :: NonEmptyList Number) / Int.toNumber (NEL.length items))
-
-calcMedian :: NonEmptyList Milliseconds -> Milliseconds
-calcMedian items = getMiddleVal (NEL.sort items)
-
-getMiddleVal :: forall a. NonEmptyList a -> a
-getMiddleVal items =
-  let
-    n = NEL.length items
-    mid = n `div` 2
-  in
-    unsafePartial $ fromJust
-      if Int.even n then
-        items !! (mid - 1)
-      else
-        items !! mid
-
-calcStdDev :: NonEmptyList Milliseconds -> Milliseconds -> Milliseconds
-calcStdDev items (Milliseconds mean) =
-  let
-    n = Int.toNumber (NEL.length items)
-    variance = sum (map (\(Milliseconds x) -> (x - mean) `Number.pow` 2.0) items) / n
-  in
-    Milliseconds (Number.sqrt variance)
 
 asciColorStr :: Int -> String -> String
 asciColorStr color str =

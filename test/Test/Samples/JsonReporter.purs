@@ -28,7 +28,7 @@ main =
         { reporters = cfg.reporters <> reporters }
     )
     $ suite
-        "Minimal Example"
+        "Sample"
         ( \cfg -> cfg
             { iterations = 1000
             , sizes = [ 0, 20_000, 40_000, 80_000 ]
