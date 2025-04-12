@@ -18,7 +18,7 @@ import Effect (Effect)
 
 main :: Effect Unit
 main =
-  BenchLib.run_ $
+  BenchLib.runNode_ $
     suite_
       "Sample"
 

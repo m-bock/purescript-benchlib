@@ -76,6 +76,7 @@ codecCheckResults :: JsonCodec CheckResults
 codecCheckResults = CAR.object "CheckResults"
   { success: CA.boolean
   , size: CA.int
+  , groupName: CA.string
   , results: CA.array
       (CAR.object "CheckResult" { showedVal: CA.string, benchName: CA.string })
   }

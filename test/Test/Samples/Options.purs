@@ -9,7 +9,7 @@ import Data.List as List
 import Effect (Effect)
 
 main :: Effect Unit
-main = BenchLib.run_ $
+main = BenchLib.runNode_ $
   suite
     "Sample"
     ( \cfg -> cfg

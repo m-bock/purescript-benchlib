@@ -23,7 +23,7 @@ reporters =
 
 main :: Effect Unit
 main =
-  BenchLib.run
+  BenchLib.runNode
     ( \cfg -> cfg
         { reporters = cfg.reporters <> reporters }
     )

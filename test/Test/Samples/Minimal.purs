@@ -13,7 +13,7 @@ import Effect (Effect)
 --- Main
 
 main :: Effect Unit
-main = BenchLib.run_ $
+main = BenchLib.runNode_ $
   suite_
     "Minimal Example"
     [ group_ "Replicate Functions"
