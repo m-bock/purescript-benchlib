@@ -5,6 +5,45 @@ import * as path from 'path';
 
 const files = {};
 
+
+
+/**
+ * Extracts the type signature of a given top-level value from a PureScript module.
+ * @param {{file: string, value: string}} param0
+ * @returns {string | null} The type signature, or null if not found.
+ */
+const convertPursVal = ({ file, value, keepValue, keepForall, keepConstraints, keepType }) => {
+  const content = fs.readFileSync(path.resolve(file), 'utf8');
+
+  const regex = new RegExp(
+    `^(?:foreign import )?${value}\\s*::\\s*(?:(forall\\s+((?:\\w+\\s*)+)\\.\\s*)?(?:(.+?)\\s*=>\\s*)?)?(.+)$`,
+    'm'
+  );
+
+
+  const match = content.match(regex);
+
+  if (!match) {
+    return null;
+  }
+
+  const matchForall = match[1]
+  const matchTypeVars = match[2]
+  const matchConstraints = match[3]
+  const matchType = match[4]
+
+  var ret = [
+    keepValue ? [value] : [],
+    (keepValue && keepType) ? ["::"] : [],
+    keepForall ? [matchForall] : [],
+    keepConstraints ? [matchConstraints] : [],
+    keepType ? [matchType] : [],
+  ].flatMap((x) => x).join(" ")
+
+  return "`" + ret + "`";
+}
+
+
 const convertPursCode = ({ file, section, collapsible, link }) => {
   const filePath = file; // Change this to your actual file
   const fileContent = fs.readFileSync(filePath, "utf8");
@@ -32,8 +71,39 @@ const convertPursCode = ({ file, section, collapsible, link }) => {
     (collapsible ? mkCollapsible : identity)(
       mkCodeBlock("purescript", sections[section], true)
     ),
-  ].join("\n");
+  ].join("\n")
 };
+
+const convertPursValDef = ({ file, name }) => {
+  const fileContent = fs.readFileSync(file, "utf8");
+
+  // Match multiline type signature (indented lines included)
+  const typeRegex = new RegExp(
+    `^${name}\\s*::[\\s\\S]*?(?=^\\S|\\Z)`,
+    "m"
+  );
+
+  // Match multiline definition (indented lines included)
+  const defRegex = new RegExp(
+    `^${name}\\s*=([\\s\\S]*?)(?=^\\S|\\Z)`,
+    "m"
+  );
+
+  const typeMatch = fileContent.match(typeRegex);
+  const defMatch = fileContent.match(defRegex);
+
+  if (!typeMatch || !defMatch) {
+    throw new Error(`Definition for '${name}' not found.`);
+  }
+
+  const typeDecl = typeMatch[0].trim();
+  const valDecl = defMatch[0].trim();
+
+  const all =`\n${typeDecl}\n${valDecl}\n`
+
+  return mkCodeBlock("purescript", all, true)
+};
+
 
 const convertCode = ({ file, link, collapsible, language }) => {
   const fileContent = fs.readFileSync(file, "utf8");
@@ -103,7 +173,7 @@ const mkCodeBlock = (lang, content, quote) => {
     .join("\n")
     .split("\n")
     .map((line) => (quote ? `> ${line}` : line))
-    .join("\n");
+    .join("\n") + "\n";
 };
 
 const fns = {
@@ -111,19 +181,30 @@ const fns = {
   run: convertRun,
   raw: convertRaw,
   code: convertCode,
+  pursVal: convertPursVal,
+  pursValDef: convertPursValDef
 };
 
 const mainFile = (filePath) => {
   const fileContent = fs.readFileSync(filePath, "utf8");
 
   const updatedContent = fileContent.replace(
-    /(<!-- start:([a-zA-Z0-9_]+)\n([\s\S]*?)-->)[\s\S]*?(<!-- end -->)/g,
-    (_, start, fnName, jsonString, end) => {
-      const json = JSON.parse(jsonString);
-      const convertFn = fns[fnName];
-      const converted = convertFn(json);
+    /<!-- start:([a-zA-Z0-9_]+)\s([\s\S]*?)-->[\s\S]*?<!-- end -->/g,
+    (_, fnName, jsonString) => {
+      console.log(`found replacement`)
+      console.log(`fnName=${fnName};`);
+      console.log(`jsonString=${jsonString};`);
 
-      return `${start}\n${converted}\n${end}`;
+      const json = JSON.parse(jsonString);
+      console.log(`json = ${json}`);
+      const convertFn = fns[fnName];
+      console.log(`convertFn = ${typeof convertFn === "undefined"}`);
+      const converted = convertFn(json);
+      console.log(`converted = ${converted}`);
+
+      const jsonPretty = JSON.stringify(json, null, 2);
+
+      return `<!-- start:${fnName} ${jsonPretty} -->${converted}<!-- end -->`;
     }
   );
 
@@ -136,30 +217,6 @@ const mainFile = (filePath) => {
   });
 };
 
-const genReadme = (folder, files) => {
-  return [
-    "# Benchlib Guide",
-
-    "This is a guide to the Benchlib library. It contains various examples and explanations.",
-
-    "## Table of Contents",
-    ...files
-      .filter((file) => file !== "README.md")
-      .map((file) => {
-        const fileName = file.replace(/\.md$/, "");
-        const h1 = extractH1(path.join(folder, file));
-        return `- [${h1}](${file})`;
-      }),
-  ].join("\n");
-}
-
-const extractH1 = (file) => {
-  const fileContent = fs.readFileSync(file, "utf8");
-  const h1Regex = /^# (.+)$/gm;
-  const match = h1Regex.exec(fileContent);
-  return match ? match[1] : null;
-}
-
 const mainFolder = ({folder, filter}) => {
   const files = fs.readdirSync(folder).filter((file) => 
     fs.statSync(path.join(folder, file)).isFile())
@@ -167,20 +224,17 @@ const mainFolder = ({folder, filter}) => {
   files.forEach((file) => {
     const fileName = path.join(folder, file);
     if (filter && !filter.test(fileName)) return;
-    if (file === "README.md") return;
-    
+      console.log(`Processing file: ${fileName}`);
       mainFile(fileName);
     
   });
 
-  const readme = genReadme(folder, files);
-  fs.writeFileSync(`${folder}/README.md`, readme, "utf8");
 };
 
 const main = () => {
   const opts = {
-    folder: "docs/chapters",
-    filter: /02/,
+    folder: "docs",
+    filter: /.*\.md$/,
   }
 
   mainFolder(opts);
