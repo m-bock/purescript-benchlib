@@ -12,7 +12,6 @@ module BenchLib
   , SuiteOpts
   , GroupOpts
   , BenchOpts
-  , BenchOptsAff
   , Reporter
   , suite
   , group
@@ -91,16 +90,9 @@ type GroupOpts a b =
   , printOutput :: Maybe (b -> String)
   }
 
--- | Options for pure benchaffarks.
-type BenchOpts a =
+-- | Options for Benchmarks.
+type BenchOpts =
   { iterations :: Int
-  , prepareInput :: Size -> a
-  }
-
--- | Options for monadic benchaffarks.
-type BenchOptsAff (m :: Type -> Type) a =
-  { iterations :: Int
-  , prepareInput :: Size -> m a
   }
 
 --- Result Types
@@ -251,16 +243,9 @@ mkDefaultGroupOpts { sizes, iterations } =
   , printOutput: Nothing
   }
 
-mkDefaultBenchOpts :: forall r. { iterations :: Int | r } -> BenchOpts Size
+mkDefaultBenchOpts :: forall r. { iterations :: Int | r } -> BenchOpts
 mkDefaultBenchOpts { iterations } =
   { iterations
-  , prepareInput: \size -> size -- TODO: mk effectful
-  }
-
-benchOptsToM :: forall a. BenchOpts a -> BenchOptsAff Aff a
-benchOptsToM { iterations, prepareInput } =
-  { iterations
-  , prepareInput: prepareInput >>> pure
   }
 
 --- Core functions
@@ -413,14 +398,14 @@ group groupName mkGroupOpts benches_ =
         pure groupResult
     }
 
-benchImpl :: forall a b. String -> (BenchOpts Size -> BenchOptsAff Aff a) -> (a -> Aff b) -> Bench a b
-benchImpl benchName mkBenchOpts benchFn =
+benchAff :: forall a b. String -> (BenchOpts -> BenchOpts) -> (Size -> Aff a) -> (a -> Aff b) -> Bench a b
+benchAff benchName mkBenchOpts prepareInput benchFn =
   Bench
     { benchName
     , only: false
     , runBench: \defOpts@{ size } -> do
 
-        let { iterations, prepareInput } = mkBenchOpts $ mkDefaultBenchOpts defOpts
+        let { iterations } = mkBenchOpts $ mkDefaultBenchOpts defOpts
 
         inputs :: NonEmptyArray _ <- replicate1A iterations (prepareInput size)
 
@@ -494,24 +479,15 @@ instance IsOnly Group where
 
 --- API shortcuts
 
-bench :: forall a b. String -> (BenchOpts Size -> BenchOpts a) -> (a -> b) -> Bench a b
-bench name mkOpts benchFn = benchImpl name mkOpts' (pure <<< benchFn)
-  where
-  mkOpts' :: BenchOpts Size -> BenchOptsAff Aff a
-  mkOpts' optsPure = benchOptsToM $ mkOpts optsPure
+bench :: forall a b. String -> (BenchOpts -> BenchOpts) -> (Size -> a) -> (a -> b) -> Bench a b
+bench name mkOpts prepareFn benchFn = benchAff name mkOpts (pure <<< prepareFn) (pure <<< benchFn)
 
-bench_ :: forall b. String -> (Size -> b) -> Bench Size b
-bench_ name benchFn = bench name identity benchFn
-
-benchAff :: forall a b. String -> (BenchOptsAff Aff Size -> BenchOptsAff Aff a) -> (a -> Aff b) -> Bench a b
-benchAff name mkOpts benchFn = benchImpl name mkOpts' benchFn
-  where
-  mkOpts' :: BenchOpts Size -> BenchOptsAff Aff a
-  mkOpts' optsPure = mkOpts $ benchOptsToM optsPure
+bench_ :: forall a b. String -> (Size -> a) -> (a -> b) -> Bench a b
+bench_ name prepareFn benchFn = bench name identity prepareFn benchFn
 
 -- | Like `benchAff`, but with default options.
-benchAff_ :: forall b. String -> (Size -> Aff b) -> Bench Size b
-benchAff_ name benchFn = benchAff name identity benchFn
+benchAff_ :: forall a b. String -> (Size -> Aff a) -> (a -> Aff b) -> Bench a b
+benchAff_ name prepareFn benchFn = benchAff name identity prepareFn benchFn
 
 runNode_ :: Suite -> Effect Unit
 runNode_ = runNode identity

@@ -25,30 +25,18 @@ prepareString :: Size -> String
 prepareString size = String.fromCharArray (Array.replicate size 'x')
 
 b1 :: Bench (Array Char) Int
-b1 = BL.bench "Length of Array of Char"
-  ( \opts -> opts
-      { iterations = 1000
-      , prepareInput = prepareCharArray
-      }
-  )
+b1 = BL.bench_ "Length of Array of Char"
+  prepareCharArray
   Array.length
 
 b2 :: Bench (List Char) Int
-b2 = BL.bench "Length of List of Char"
-  ( \opts -> opts
-      { iterations = 1000
-      , prepareInput = prepareCharList
-      }
-  )
+b2 = BL.bench_ "Length of List of Char"
+  prepareCharList
   List.length
 
 b3 :: Bench String Int
-b3 = BL.bench "Length of String"
-  ( \opts -> opts
-      { iterations = 1000
-      , prepareInput = prepareString
-      }
-  )
+b3 = BL.bench_ "Length of String"
+  prepareString
   String.length
 
 b1' :: Bench Unit Unit

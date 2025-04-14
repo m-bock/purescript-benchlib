@@ -30,6 +30,7 @@ main = BenchLib.runNode_ $
                 { iterations = 1000
                 }
             )
+            identity
             (\size -> Array.range 0 size)
 
         , basic $ bench
@@ -38,6 +39,7 @@ main = BenchLib.runNode_ $
                 { iterations = 1000
                 }
             )
+            identity
             (\size -> List.range 0 size)
         ]
     ]

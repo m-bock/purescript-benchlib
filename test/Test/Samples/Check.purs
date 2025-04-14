@@ -2,7 +2,7 @@ module Test.Samples.Check where
 
 import Prelude
 
-import BenchLib (bench, group, normalize, suite_)
+import BenchLib (bench, bench_, group, normalize, suite_)
 import BenchLib as BenchLib
 import Data.Array as Array
 import Data.Foldable (all)
@@ -33,36 +33,24 @@ main =
               }
 
           )
-          [ normalize List.toUnfoldable List.toUnfoldable $ bench
+          [ normalize List.toUnfoldable List.toUnfoldable $ bench_
               "List"
-              ( \cfg -> cfg
-                  { prepareInput = \(size :: Int) -> range 0 size
-                  }
-              )
+              (\(size :: Int) -> range 0 size)
               (\(items :: List Int) -> List.reverse items)
 
-          , normalize NEL.toUnfoldable NEL.toUnfoldable $ bench
+          , normalize NEL.toUnfoldable NEL.toUnfoldable $ bench_
               "NonEmptyList"
-              ( \cfg -> cfg
-                  { prepareInput = \(size :: Int) -> range 0 size
-                  }
-              )
+              (\(size :: Int) -> range 0 size)
               (\(items :: NonEmptyList Int) -> NEL.reverse items)
 
-          , normalize LazyList.toUnfoldable LazyList.toUnfoldable $ bench
+          , normalize LazyList.toUnfoldable LazyList.toUnfoldable $ bench_
               "Lazy List"
-              ( \cfg -> cfg
-                  { prepareInput = \(size :: Int) -> range 0 size
-                  }
-              )
+              ( \(size :: Int) -> range 0 size)
               (\(items :: Lazy.List Int) -> LazyList.reverse items)
 
-          , bench
+          , bench_
               "Array"
-              ( \cfg -> cfg
-                  { prepareInput = \(size :: Int) -> range 0 size
-                  }
-              )
+              ( \(size :: Int) -> range 0 size)
               (\(items :: Array Int) -> Array.reverse items)
           ]
       ]

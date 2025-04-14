@@ -38,10 +38,12 @@ main =
             "Replicate functions"
             [ basic $ bench_
                 "Array"
+                identity
                 (\size -> Array.replicate size 'x')
 
             , basic $ bench_
                 "Lazy List"
+                identity
                 (\size -> LazyList.replicate size 'x')
             ]
         ]
