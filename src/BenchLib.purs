@@ -87,6 +87,8 @@ type GroupOpts a b =
   , iterations :: Int
   , checkInputs :: Maybe ({ results :: Array a, size :: Size } -> Boolean)
   , checkOutputs :: Maybe ({ results :: Array b, size :: Size } -> Boolean)
+  , printInput :: Maybe (a -> String)
+  , printOutput :: Maybe (b -> String)
   }
 
 -- | Options for pure benchaffarks.
@@ -187,7 +189,7 @@ type CheckResults =
   { groupName :: String
   , success :: Boolean
   , size :: Size
-  , results :: Array { showedVal :: String, benchName :: String }
+  , results :: Array { showedVal :: Maybe String, benchName :: String }
   }
 
 --- Internal Types
@@ -245,6 +247,8 @@ mkDefaultGroupOpts { sizes, iterations } =
   , iterations
   , checkInputs: Nothing
   , checkOutputs: Nothing
+  , printInput: Nothing
+  , printOutput: Nothing
   }
 
 mkDefaultBenchOpts :: forall r. { iterations :: Int | r } -> BenchOpts Size
@@ -313,7 +317,7 @@ type PerSizeItf a b =
   , getCheckInputsResults :: Aff (Maybe (Array CheckResults))
   }
 
-mkPerSizeItf :: forall a b. Show a => Show b => GroupName -> GroupOpts a b -> Aff (PerSizeItf a b)
+mkPerSizeItf :: forall a b. GroupName -> GroupOpts a b -> Aff (PerSizeItf a b)
 mkPerSizeItf groupName groupOpts = liftEffect do
   refAccum <- Ref.new (Map.empty :: Map Size (ResultPerSize a b))
 
@@ -336,7 +340,7 @@ mkPerSizeItf groupName groupOpts = liftEffect do
                 { size
                 , groupName
                 , success: checkOutputs { results: map _.value outputs, size }
-                , results: map (\{ benchName, value } -> { benchName, showedVal: show value }) outputs
+                , results: map (\{ benchName, value } -> { benchName, showedVal: map (\f -> f value) groupOpts.printOutput }) outputs
                 }
             )
             (Map.toUnfoldable accum)
@@ -351,7 +355,7 @@ mkPerSizeItf groupName groupOpts = liftEffect do
                 { groupName
                 , size
                 , success: checkInputs { results: map _.value inputs, size }
-                , results: map (\{ benchName, value } -> { benchName, showedVal: show value }) inputs
+                , results: map (\{ benchName, value } -> { benchName, showedVal: map (\f -> f value) groupOpts.printInput }) inputs
                 }
             )
             (Map.toUnfoldable accum)
@@ -360,7 +364,7 @@ mkPerSizeItf groupName groupOpts = liftEffect do
 -- | Create a benchaffark group of a given name.
 -- | The group will be run with the provided options.
 -- | The group is a collection of benchaffarks
-group :: forall @a @b. Show a => Show b => String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
+group :: forall a b. String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
 group groupName mkGroupOpts benches_ =
   Group
     { groupName
@@ -517,7 +521,7 @@ suite_ :: String -> Array Group -> Suite
 suite_ groupName benchaffarks = suite groupName identity benchaffarks
 
 -- | Like `group`, but with default options.
-group_ :: forall a b. Show a => Show b => String -> Array (Bench a b) -> Group
+group_ :: forall a b. String -> Array (Bench a b) -> Group
 group_ groupName benches = group groupName identity benches
 
 --- Utils

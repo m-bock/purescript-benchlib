@@ -11,6 +11,7 @@ import BenchLib (BenchResult, GroupResult, Reporter, SampleResult, SuiteResult, 
 import Data.Argonaut (stringifyWithIndent)
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
+import Data.Codec.Argonaut.Common as CAC
 import Data.Codec.Argonaut.Compat as CAP
 import Data.Codec.Argonaut.Record as CAR
 import Data.Newtype (unwrap, wrap)
@@ -78,7 +79,7 @@ codecCheckResults = CAR.object "CheckResults"
   , size: CA.int
   , groupName: CA.string
   , results: CA.array
-      (CAR.object "CheckResult" { showedVal: CA.string, benchName: CA.string })
+      (CAR.object "CheckResult" { showedVal: CAC.maybe CA.string, benchName: CA.string })
   }
 
 codecSampleResult :: JsonCodec SampleResult
