@@ -12,7 +12,7 @@ A simple and flexible benchmarking library for PureScript.
 
 - __Supports Pure & Effectful Functions__ – Benchmark any kind of computation.
 
-- __Pure PureScript__ – No JavaScript libraries under the hood, ensuring full type safety.
+- __Just PureScript__ – No JavaScript libraries under the hood, ensuring full type safety.
 
 <br>
 
@@ -40,6 +40,8 @@ import Data.Array as Array
 import Data.List.Lazy as LazyList
 import Effect (Effect)
 
+--- Main
+
 main :: Effect Unit
 main = BenchLib.runNode_ $
   suite_
@@ -47,14 +49,15 @@ main = BenchLib.runNode_ $
     [ group_ "Replicate Functions"
         [ basic $ bench_
             "Array"
+            identity
             (\size -> Array.replicate size 'x')
 
         , basic $ bench_
             "Lazy List"
+            identity
             (\size -> LazyList.replicate size 'x')
         ]
     ]
-
 ```
 
 ### 2. Run Benchmarks from Terminal
