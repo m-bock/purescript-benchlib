@@ -148,38 +148,30 @@
         "test": {
           "dependencies": [
             "console",
-            "debug",
             "effect",
-            "language-cst-parser",
             "lists",
             "node-process",
-            "patchdown",
             "spec"
           ],
           "build_plan": [
             "aff",
             "ansi",
-            "argonaut-core",
             "arraybuffer-types",
             "arrays",
             "avar",
             "bifunctors",
             "catenable-lists",
-            "codec",
-            "codec-argonaut",
             "console",
             "const",
             "contravariant",
             "control",
             "datetime",
-            "debug",
             "distributive",
             "effect",
             "either",
             "enums",
             "exceptions",
             "exists",
-            "filterable",
             "foldable-traversable",
             "foreign",
             "foreign-object",
@@ -191,8 +183,6 @@
             "identity",
             "integers",
             "invariant",
-            "js-date",
-            "language-cst-parser",
             "lazy",
             "lists",
             "maybe",
@@ -200,8 +190,6 @@
             "newtype",
             "node-buffer",
             "node-event-emitter",
-            "node-fs",
-            "node-path",
             "node-process",
             "node-streams",
             "nonempty",
@@ -212,12 +200,10 @@
             "orders",
             "parallel",
             "partial",
-            "patchdown",
             "pipes",
             "posix-types",
             "prelude",
             "profunctor",
-            "record",
             "refs",
             "safe-coerce",
             "spec",
@@ -229,8 +215,7 @@
             "type-equality",
             "typelevel-prelude",
             "unfoldable",
-            "unsafe-coerce",
-            "variant"
+            "unsafe-coerce"
           ]
         }
       }
@@ -766,11 +751,7 @@
         "zipperarray": "2.0.0"
       }
     },
-    "extra_packages": {
-      "patchdown": {
-        "path": "../patchdown"
-      }
-    }
+    "extra_packages": {}
   },
   "packages": {
     "aff": {
@@ -1013,15 +994,6 @@
         "tuples"
       ]
     },
-    "debug": {
-      "type": "registry",
-      "version": "6.0.2",
-      "integrity": "sha256-vmkYFuXYuELBzeauvgHG6E6Kf/Hp1dAnxwE9ByHfwSg=",
-      "dependencies": [
-        "functions",
-        "prelude"
-      ]
-    },
     "distributive": {
       "type": "registry",
       "version": "6.0.0",
@@ -1087,19 +1059,6 @@
       "integrity": "sha256-A0JQHpTfo1dNOj9U5/Fd3xndlRSE0g2IQWOGor2yXn8=",
       "dependencies": [
         "unsafe-coerce"
-      ]
-    },
-    "filterable": {
-      "type": "registry",
-      "version": "5.0.0",
-      "integrity": "sha256-cCojJHRnTmpY1j1kegI4CFwghdQ2Fm/8dzM8IlC+lng=",
-      "dependencies": [
-        "arrays",
-        "either",
-        "foldable-traversable",
-        "identity",
-        "lists",
-        "ordered-collections"
       ]
     },
     "foldable-traversable": {
@@ -1270,40 +1229,6 @@
         "foreign",
         "integers",
         "now"
-      ]
-    },
-    "language-cst-parser": {
-      "type": "registry",
-      "version": "0.14.1",
-      "integrity": "sha256-LJzh1ZTaKjcrHx95ZfO2La3w6Xb/IZQT3m2Nuj4n1dM=",
-      "dependencies": [
-        "arrays",
-        "const",
-        "control",
-        "effect",
-        "either",
-        "enums",
-        "foldable-traversable",
-        "free",
-        "functions",
-        "functors",
-        "identity",
-        "integers",
-        "lazy",
-        "lists",
-        "maybe",
-        "newtype",
-        "numbers",
-        "ordered-collections",
-        "partial",
-        "prelude",
-        "st",
-        "strings",
-        "transformers",
-        "tuples",
-        "typelevel-prelude",
-        "unfoldable",
-        "unsafe-coerce"
       ]
     },
     "lazy": {
@@ -1553,23 +1478,6 @@
       "version": "4.0.0",
       "integrity": "sha256-fwXerld6Xw1VkReh8yeQsdtLVrjfGiVuC5bA1Wyo/J4=",
       "dependencies": []
-    },
-    "patchdown": {
-      "type": "local",
-      "path": "../patchdown",
-      "dependencies": [
-        "argonaut-core",
-        "codec-argonaut",
-        "console",
-        "debug",
-        "effect",
-        "exists",
-        "filterable",
-        "language-cst-parser",
-        "node-fs",
-        "node-process",
-        "prelude"
-      ]
     },
     "pipes": {
       "type": "registry",

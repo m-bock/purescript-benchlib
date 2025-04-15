@@ -34,7 +34,6 @@ package:
       - spec
       - node-process
       - lists
-      - patchdown
   publish:
     version: 0.0.3
     license: BSD-3-Clause
@@ -44,6 +43,4 @@ package:
 workspace:
   packageSet:
     registry: 63.8.0
-  extraPackages:
-    patchdown:
-      path: ../patchdown
+  extraPackages: {}
