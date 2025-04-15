@@ -35,8 +35,6 @@ package:
       - node-process
       - lists
       - patchdown
-      - language-cst-parser # transitive of patchdown
-      - debug # transitive of patchdown
   publish:
     version: 0.0.3
     license: BSD-3-Clause
