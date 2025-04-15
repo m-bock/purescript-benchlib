@@ -570,19 +570,6 @@ reportConsole = defaultReporter
           ]
       )
 
-  , onGroupFinish = \{ groupName, benchResults, checkOutputsResults, checkInputsResults } -> do
-      Console.log ("    • check:")
-  -- for_ benchResults \{ benchName, samples } -> do
-  --   Console.log ("    • " <> (asciColorStr bgGray ("bench: " <> benchName)))
-  --   for_ samples \{ size, average, iterations } -> do
-  --     Console.log
-  --       ( "      • " <> printStats
-  --           [ "size" /\ Int.toStringAs Int.decimal size
-  --           , "count" /\ Int.toStringAs Int.decimal iterations
-  --           , "avg" /\ printMs average
-  --           ]
-  --       )
-
   , onSuiteFinish = \_ -> Console.log "Suite finished"
   }
 
