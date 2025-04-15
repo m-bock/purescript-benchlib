@@ -30,9 +30,6 @@
               "foldable-traversable": ">=6.0.0 <7.0.0"
             },
             {
-              "identity": ">=6.0.0 <7.0.0"
-            },
-            {
               "integers": ">=6.0.0 <7.0.0"
             },
             {
@@ -49,6 +46,9 @@
             },
             {
               "node-path": ">=5.0.1 <6.0.0"
+            },
+            {
+              "node-process": ">=11.2.0 <12.0.0"
             },
             {
               "now": ">=6.0.0 <7.0.0"
@@ -118,6 +118,7 @@
             "node-event-emitter",
             "node-fs",
             "node-path",
+            "node-process",
             "node-streams",
             "nonempty",
             "now",
@@ -127,6 +128,7 @@
             "orders",
             "parallel",
             "partial",
+            "posix-types",
             "prelude",
             "profunctor",
             "profunctor-lenses",
@@ -222,7 +224,7 @@
     },
     "package_set": {
       "address": {
-        "registry": "63.8.0"
+        "registry": "64.1.0"
       },
       "compiler": ">=0.15.15 <0.16.0",
       "content": {
@@ -262,7 +264,8 @@
         "b64": "0.0.8",
         "barbies": "1.0.1",
         "barlow-lens": "0.9.0",
-        "bifunctors": "6.0.0",
+        "benchlib": "0.0.2",
+        "bifunctors": "6.1.0",
         "bigints": "7.0.1",
         "bolson": "0.3.9",
         "bookhound": "0.1.7",
@@ -395,7 +398,7 @@
         "halogen-declarative-canvas": "0.0.8",
         "halogen-echarts-simple": "0.0.4",
         "halogen-formless": "4.0.3",
-        "halogen-helix": "1.0.1",
+        "halogen-helix": "1.1.0",
         "halogen-hooks": "0.6.3",
         "halogen-hooks-extra": "0.9.0",
         "halogen-infinite-scroll": "1.1.0",
@@ -404,6 +407,7 @@
         "halogen-subscriptions": "2.0.0",
         "halogen-svg-elems": "8.0.0",
         "halogen-typewriter": "1.0.4",
+        "halogen-use-trigger-hooks": "1.0.0",
         "halogen-vdom": "8.0.0",
         "halogen-vdom-string-renderer": "0.5.0",
         "halogen-xterm": "2.0.0",
@@ -885,8 +889,8 @@
     },
     "bifunctors": {
       "type": "registry",
-      "version": "6.0.0",
-      "integrity": "sha256-/gZwC9YhNxZNQpnHa5BIYerCGM2jeX9ukZiEvYxm5Nw=",
+      "version": "6.1.0",
+      "integrity": "sha256-6enQzl1vqnFTQZ1WX9BnoOOVdPGO9WZvVXldHckVQvY=",
       "dependencies": [
         "const",
         "either",
