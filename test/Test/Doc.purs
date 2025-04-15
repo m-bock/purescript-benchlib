@@ -2,17 +2,13 @@ module Test.Doc where
 
 import Prelude
 
-import BenchLib (Bench, BenchOpts(..), Group, Size(..), Size, bench, benchAff, bench_)
+import BenchLib (Bench, Group, Size, Suite)
 import BenchLib as BL
+import Data.Array (all)
 import Data.Array as Array
-import Data.Generic.Rep (from)
-import Data.List.Lazy (List(..))
+import Data.List.Lazy (List)
 import Data.List.Lazy as List
-import Data.Map (Map)
-import Data.Map as Map
 import Data.Maybe (Maybe(..))
-import Data.String as Str
-import Data.String.CodeUnits (fromCharArray, toCharArray)
 import Data.String.CodeUnits as String
 
 prepareCharArray :: Size -> Array Char
@@ -24,31 +20,99 @@ prepareCharList size = List.replicate size 'x'
 prepareString :: Size -> String
 prepareString size = String.fromCharArray (Array.replicate size 'x')
 
-b1 :: Bench (Array Char) Int
-b1 = BL.bench_ "Length of Array of Char"
+bench1 :: Bench (Array Char) Int
+bench1 = BL.bench_ "Length of Array of Char"
   prepareCharArray
   Array.length
 
-b2 :: Bench (List Char) Int
-b2 = BL.bench_ "Length of List of Char"
+bench2 :: Bench (List Char) Int
+bench2 = BL.bench_ "Length of List of Char"
   prepareCharList
   List.length
 
-b3 :: Bench String Int
-b3 = BL.bench_ "Length of String"
+bench3 :: Bench String Int
+bench3 = BL.bench_ "Length of String"
   prepareString
   String.length
 
-b1' :: Bench Unit Unit
-b1' = BL.basic b1
+benchBasic1 :: Bench Unit Unit
+benchBasic1 = BL.basic bench1
 
-b2' :: Bench Unit Unit
-b2' = BL.basic b2
+benchBasic2 :: Bench Unit Unit
+benchBasic2 = BL.basic bench2
 
-b3' :: Bench Unit Unit
-b3' = BL.basic b3
+benchBasic3 :: Bench Unit Unit
+benchBasic3 = BL.basic bench3
 
 groupBasic :: Group
 groupBasic = BL.group_
+  "Length operations"
+  [ benchBasic1
+  , benchBasic2
+  , benchBasic3
+  ]
+
+groupBasic' :: Group
+groupBasic' = BL.group
+  "Length operations"
+  (\opts -> opts)
+  [ benchBasic1
+  , benchBasic2
+  , benchBasic3
+  ]
+
+benchNormalized1 :: Bench (Array Char) Int
+benchNormalized1 = bench1
+
+benchNormalized2 :: Bench (Array Char) Int
+benchNormalized2 = BL.normalizeInput List.toUnfoldable bench2
+
+benchNormalized3 :: Bench (Array Char) Int
+benchNormalized3 = BL.normalizeInput String.toCharArray bench3
+
+groupNormalized :: Group
+groupNormalized = BL.group_
   "Length of Char"
-  [ b1', b2', b3' ]
+  [ benchNormalized1
+  , benchNormalized2
+  , benchNormalized3
+  ]
+
+suite1 ∷ Suite
+suite1 = BL.suite_ "My Benchmarks"
+  [ groupNormalized
+  ]
+
+suite2 ∷ Suite
+suite2 =
+  BL.suite_
+    "My Benchmarks"
+    [ BL.group
+        "Length operations"
+        ( \opts -> opts
+            { sizes = [ 1, 10, 100, 1000 ]
+            , iterations = 1000
+
+            , checkInputs = Just \size ->
+                all (_ == Array.replicate size 'x')
+
+            , checkOutputs = Just \size ->
+                all (_ == Array.length (Array.replicate size 'x'))
+            }
+        )
+        [ BL.bench_
+            "Length of Array of Char"
+            (\size -> Array.replicate size 'x')
+            Array.length
+
+        , BL.normalizeInput List.toUnfoldable $ BL.bench_
+            "Length of List of Char"
+            (\size -> List.replicate size 'x')
+            List.length
+
+        , BL.normalizeInput String.toCharArray $ BL.bench_
+            "Length of String"
+            (\size -> String.fromCharArray (Array.replicate size 'x'))
+            String.length
+        ]
+    ]

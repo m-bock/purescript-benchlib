@@ -25,10 +25,10 @@ main =
       [ group
           "Reverse collection"
           ( \cfg -> cfg
-              { checkInputs = Just \{ results, size } ->
+              { checkInputs = Just \size results ->
                   all (\result -> result == range 0 size) (results :: Array _)
 
-              , checkOutputs = Just \{ results, size } ->
+              , checkOutputs = Just \size results ->
                   all (\result -> result == Array.reverse (range 0 size)) (results :: Array _)
               }
 

@@ -69,23 +69,23 @@ type Size = Int
 
 --- Option Types
 
--- | Options to run benchaffark suites.
+-- | Options to run benchmark suites.
 type RunOpts =
   { reporters :: Array Reporter
   }
 
--- | Options for the benchaffark suite.
+-- | Options for the benchmark suite.
 type SuiteOpts =
   { sizes :: Array Size
   , iterations :: Int
   }
 
--- | Options for the benchaffark group.
+-- | Options for the benchmark group.
 type GroupOpts a b =
   { sizes :: Array Int
   , iterations :: Int
-  , checkInputs :: Maybe ({ results :: Array a, size :: Size } -> Boolean)
-  , checkOutputs :: Maybe ({ results :: Array b, size :: Size } -> Boolean)
+  , checkInputs :: Maybe (Size -> Array a -> Boolean)
+  , checkOutputs :: Maybe (Size -> Array b -> Boolean)
   , printInput :: Maybe (a -> String)
   , printOutput :: Maybe (b -> String)
   }
@@ -97,13 +97,13 @@ type BenchOpts =
 
 --- Result Types
 
--- | The result of a benchaffark suite.
+-- | The result of a benchmark suite.
 type SuiteResult =
   { groupResults :: Array GroupResult
   , suiteName :: String
   }
 
--- | The result of a benchaffark group.
+-- | The result of a benchmark group.
 type GroupResult =
   { groupName :: String
   , benchResults :: Array BenchResult
@@ -111,13 +111,13 @@ type GroupResult =
   , checkInputsResults :: Maybe (Array CheckResults)
   }
 
--- | The result of a benchaffark.
+-- | The result of a benchmark.
 type BenchResult =
   { benchName :: String
   , samples :: Array SampleResult
   }
 
--- | The result of one benchaffark sample.
+-- | The result of one benchmark sample.
 type SampleResult =
   { iterations :: Int
   , size :: Size
@@ -126,7 +126,7 @@ type SampleResult =
 
 --- Opaque types
 
--- | Opaque type for the benchaffark suite.
+-- | Opaque type for the benchmark suite.
 newtype Suite = Suite
   { suiteName :: String
   , runSuite ::
@@ -137,7 +137,7 @@ newtype Suite = Suite
       -> Aff (Maybe SuiteResult)
   }
 
--- | Opaque type for the benchaffark group.
+-- | Opaque type for the benchmark group.
 newtype Group = Group
   { only :: Boolean
   , groupName :: String
@@ -149,7 +149,7 @@ newtype Group = Group
       -> Aff GroupResult
   }
 
--- | Opaque type for the benchaffark.
+-- | Opaque type for the benchmark.
 newtype Bench a b = Bench
   { only :: Boolean
   , benchName :: String
@@ -164,8 +164,8 @@ derive instance Functor (Bench a)
 
 --- Reporter types
 
--- | A reporter is a set of functions that are called at different stages of the benchaffark.
--- | It allows to customize the output of the benchaffark suite or perform other actions like writing to a file.
+-- | A reporter is a set of functions that are called at different stages of the benchmark.
+-- | It allows to customize the output of the benchmark suite or perform other actions like writing to a file.
 type Reporter =
   { onSuiteStart :: String -> Aff Unit
   , onGroupStart :: String -> Aff Unit
@@ -190,9 +190,9 @@ type BenchName = String
 
 type GroupName = String
 
---- Running the benchaffark suite
+--- Running the benchmark suite
 
--- | Run the benchaffark suite.
+-- | Run the benchmark suite.
 runNode :: (RunOpts -> RunOpts) -> Suite -> Effect Unit
 runNode mkRunOpts (Suite { runSuite }) = launchAff_ do
   let
@@ -213,7 +213,7 @@ runNode mkRunOpts (Suite { runSuite }) = launchAff_ do
 --- Exported utility functions
 
 -- | Check if all elements in the array are equal.
--- | Useful for checking the results of benchaffarks.
+-- | Useful for checking the results of benchmarks.
 checkAllEq :: forall a. Eq a => Array a -> Boolean
 checkAllEq items =
   case Array.head items of
@@ -250,9 +250,9 @@ mkDefaultBenchOpts { iterations } =
 
 --- Core functions
 
--- | Create a benchaffark suite of a given name.
+-- | Create a benchmark suite of a given name.
 -- | The suite will be run with the provided options.
--- | The suite is a collection of groups, each containing multiple benchaffarks.
+-- | The suite is a collection of groups, each containing multiple benchmarks.
 suite :: String -> (SuiteOpts -> SuiteOpts) -> Array Group -> Suite
 suite suiteName mkSuiteOpts groups_ = Suite
   { suiteName
@@ -324,7 +324,7 @@ mkPerSizeItf groupName groupOpts = liftEffect do
             ( \(size /\ { outputs }) ->
                 { size
                 , groupName
-                , success: checkOutputs { results: map _.value outputs, size }
+                , success: checkOutputs size (map _.value outputs)
                 , results: map (\{ benchName, value } -> { benchName, showedVal: map (\f -> f value) groupOpts.printOutput }) outputs
                 }
             )
@@ -339,17 +339,22 @@ mkPerSizeItf groupName groupOpts = liftEffect do
             ( \(size /\ { inputs }) ->
                 { groupName
                 , size
-                , success: checkInputs { results: map _.value inputs, size }
+                , success: checkInputs size (map _.value inputs)
                 , results: map (\{ benchName, value } -> { benchName, showedVal: map (\f -> f value) groupOpts.printInput }) inputs
                 }
             )
             (Map.toUnfoldable accum)
     }
 
--- | Create a benchaffark group of a given name.
+-- | Create a benchmark group of a given name.
 -- | The group will be run with the provided options.
--- | The group is a collection of benchaffarks
-group :: forall a b. String -> (GroupOpts a b -> GroupOpts a b) -> Array (Bench a b) -> Group
+-- | The group is a collection of benchmarks
+group
+  :: forall a b
+   . String
+  -> (GroupOpts a b -> GroupOpts a b)
+  -> Array (Bench a b)
+  -> Group
 group groupName mkGroupOpts benches_ =
   Group
     { groupName
@@ -457,7 +462,7 @@ basic = normalizeAff (const $ pure unit) (const $ pure unit)
 --- Typeclasses
 
 -- | A combinator for entities that can be run only once.
--- | This is useful while debugging or developing benchaffarks.
+-- | This is useful while debugging or developing benchmarks.
 -- | So you do not have to run the whole suite again and again.
 class CanRunOnly a where
   only :: Warn (Text "`only` usage") => a -> a
@@ -494,7 +499,7 @@ runNode_ = runNode identity
 
 -- | Like `suite`, but with default options.
 suite_ :: String -> Array Group -> Suite
-suite_ groupName benchaffarks = suite groupName identity benchaffarks
+suite_ groupName benchmarks = suite groupName identity benchmarks
 
 -- | Like `group`, but with default options.
 group_ :: forall a b. String -> Array (Bench a b) -> Group
