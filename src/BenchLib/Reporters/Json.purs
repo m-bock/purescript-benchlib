@@ -7,7 +7,7 @@ module BenchLib.Reporters.Json
 
 import Prelude
 
-import BenchLib (BenchResult, GroupResult, Reporter, SampleResult, SuiteResult, CheckResults, defaultReporter)
+import BenchLib (BenchResult, CheckResults, GroupResult, Reporter, SampleResult, SuiteResult, CheckResult, defaultReporter)
 import Data.Argonaut (stringifyWithIndent)
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
@@ -63,8 +63,7 @@ codecGroupResult :: JsonCodec GroupResult
 codecGroupResult = CAR.object "GroupResult"
   { groupName: CA.string
   , benchResults: CA.array codecBenchResult
-  , checkOutputsResults: CAP.maybe (CA.array codecCheckResults)
-  , checkInputsResults: CAP.maybe (CA.array codecCheckResults)
+  , checkResults: CAP.maybe (CA.array codecCheckResults)
   }
 
 codecBenchResult :: JsonCodec BenchResult
@@ -78,8 +77,14 @@ codecCheckResults = CAR.object "CheckResults"
   { success: CA.boolean
   , size: CA.int
   , groupName: CA.string
-  , results: CA.array
-      (CAR.object "CheckResult" { showedVal: CAC.maybe CA.string, benchName: CA.string })
+  , results: CA.array codecCheckResult
+  }
+
+codecCheckResult :: JsonCodec CheckResult
+codecCheckResult = CAR.object "CheckResult"
+  { showedInput: CAC.maybe CA.string
+  , showedOutput: CAC.maybe CA.string
+  , benchName: CA.string
   }
 
 codecSampleResult :: JsonCodec SampleResult

@@ -10,6 +10,7 @@ import Data.List.Lazy (List)
 import Data.List.Lazy as List
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as String
+import Data.Tuple.Nested ((/\))
 
 prepareCharArray :: Size -> Array Char
 prepareCharArray size = Array.replicate size 'x'
@@ -93,11 +94,9 @@ suite2 =
             { sizes = [ 1, 10, 100, 1000 ]
             , iterations = 1000
 
-            , checkInputs = Just \size ->
-                all (_ == Array.replicate size 'x')
+            , check = Just \size -> all \(input /\ output) ->
+                (input == Array.replicate size 'x') && (output == Array.length input)
 
-            , checkOutputs = Just \size ->
-                all (_ == Array.length (Array.replicate size 'x'))
             }
         )
         [ BL.bench_

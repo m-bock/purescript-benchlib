@@ -20,7 +20,7 @@ Focus on writing benchmarks, not boilerplate.
 
 ## Limitations
 
-- Currently, the library only supports Node.js. However, we plan to add browser support in the future.
+- Currently, the library only supports Node.js. However, it's planned to add browser support in the future.
 
 - The library is still in its early stages, and we welcome contributions to improve it.
 

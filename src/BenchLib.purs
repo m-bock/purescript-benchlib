@@ -1,40 +1,41 @@
 module BenchLib
-  ( Size
-  , Bench
-  , Group
-  , Suite
-  , BenchResult
-  , GroupResult
-  , SuiteResult
-  , SampleResult
-  , CheckResults
-  , RunOpts
-  , SuiteOpts
-  , GroupOpts
+  ( Bench
   , BenchOpts
+  , BenchResult
+  , CheckResult
+  , CheckResults
+  , Group
+  , GroupOpts
+  , GroupResult
   , Reporter
-  , suite
-  , group
+  , RunOpts
+  , SampleResult
+  , Size
+  , Suite
+  , SuiteOpts
+  , SuiteResult
+  , basic
   , bench
   , benchAff
-  , runNode_
-  , suite_
-  , group_
   , benchAff_
   , bench_
-  , basic
-  , normalizeAff
-  , normalize
-  , normalizeInputAff
-  , normalizeOutputAff
-  , normalizeInput
-  , normalizeOutput
   , checkAllEq
   , class CanRunOnly
-  , only
   , defaultReporter
+  , group
+  , group_
+  , normalize
+  , normalizeAff
+  , normalizeInput
+  , normalizeInputAff
+  , normalizeOutput
+  , normalizeOutputAff
+  , only
   , reportConsole
   , runNode
+  , runNode_
+  , suite
+  , suite_
   ) where
 
 import Prelude
@@ -43,10 +44,12 @@ import Data.Array (filter, foldr)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.DateTime.Instant (unInstant)
+import Data.Filterable (filterMap)
+import Data.Foldable (all)
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.Number.Format as NumFmt
 import Data.String as Str
@@ -84,8 +87,7 @@ type SuiteOpts =
 type GroupOpts a b =
   { sizes :: Array Int
   , iterations :: Int
-  , checkInputs :: Maybe (Size -> Array a -> Boolean)
-  , checkOutputs :: Maybe (Size -> Array b -> Boolean)
+  , check :: Maybe (Size -> Array (a /\ b) -> Boolean)
   , printInput :: Maybe (a -> String)
   , printOutput :: Maybe (b -> String)
   }
@@ -107,8 +109,7 @@ type SuiteResult =
 type GroupResult =
   { groupName :: String
   , benchResults :: Array BenchResult
-  , checkOutputsResults :: Maybe (Array CheckResults)
-  , checkInputsResults :: Maybe (Array CheckResults)
+  , checkResults :: Maybe (Array CheckResults)
   }
 
 -- | The result of a benchmark.
@@ -181,7 +182,13 @@ type CheckResults =
   { groupName :: String
   , success :: Boolean
   , size :: Size
-  , results :: Array { showedVal :: Maybe String, benchName :: String }
+  , results :: Array CheckResult
+  }
+
+type CheckResult =
+  { showedInput :: Maybe String
+  , showedOutput :: Maybe String
+  , benchName :: String
   }
 
 --- Internal Types
@@ -207,8 +214,8 @@ runNode mkRunOpts (Suite { runSuite }) = launchAff_ do
   result <- runSuite { reporter, iterations, sizes }
 
   case result of
-    Nothing -> liftEffect $ Process.exit' 1
-    Just _ -> pure unit
+    Nothing -> pure unit
+    Just _ -> liftEffect $ Process.exit' 1
 
 --- Exported utility functions
 
@@ -237,8 +244,7 @@ mkDefaultGroupOpts :: forall r a b. { sizes :: Array Size, iterations :: Int | r
 mkDefaultGroupOpts { sizes, iterations } =
   { sizes
   , iterations
-  , checkInputs: Nothing
-  , checkOutputs: Nothing
+  , check: Nothing
   , printInput: Nothing
   , printOutput: Nothing
   }
@@ -285,7 +291,7 @@ isSuccess groupResults =
   let
     checkResults = groupResults
       # map
-          ( \{ checkOutputsResults } -> case checkOutputsResults of
+          ( \{ checkResults } -> case checkResults of
               Just xs -> xs
               Nothing -> []
           )
@@ -298,52 +304,43 @@ isSuccess groupResults =
 
 type PerSizeItf a b =
   { addEntry :: { size :: Size, benchName :: String, input :: a, output :: b } -> Aff Unit
-  , getCheckOutputsResults :: Aff (Maybe (Array CheckResults))
-  , getCheckInputsResults :: Aff (Maybe (Array CheckResults))
+  , getCheckResults :: Aff (Maybe (Array CheckResults))
   }
 
 mkPerSizeItf :: forall a b. GroupName -> GroupOpts a b -> Aff (PerSizeItf a b)
-mkPerSizeItf groupName groupOpts = liftEffect do
+mkPerSizeItf groupName groupOpts@{ printInput, printOutput } = liftEffect do
   refAccum <- Ref.new (Map.empty :: Map Size (ResultPerSize a b))
 
   pure
     { addEntry: \{ size, benchName, input, output } -> liftEffect $ Ref.modify_
-        ( Map.insertWith (<>) size
-            { inputs: [ { benchName, value: input } ]
-            , outputs: [ { benchName, value: output } ]
-            }
+        ( Map.insertWith (<>) size [ { benchName, input, output } ]
         )
         refAccum
 
-    , getCheckOutputsResults: do
+    , getCheckResults: do
         accum <- liftEffect $ Ref.read refAccum
 
-        pure do
-          checkOutputs <- groupOpts.checkOutputs
-          Just $ map
-            ( \(size /\ { outputs }) ->
-                { size
-                , groupName
-                , success: checkOutputs size (map _.value outputs)
-                , results: map (\{ benchName, value } -> { benchName, showedVal: map (\f -> f value) groupOpts.printOutput }) outputs
-                }
-            )
-            (Map.toUnfoldable accum)
+        let
+          ret = groupOpts.check # map \checkFn ->
+            Map.toUnfoldable accum
+              # map
+                  ( \(size /\ results_) ->
+                      let
+                        results = map
+                          ( \{ benchName, input, output } ->
+                              { benchName
+                              , showedInput: map (_ $ input) printInput
+                              , showedOutput: map (_ $ output) printOutput
+                              }
+                          )
+                          results_
 
-    , getCheckInputsResults: do
-        accum <- liftEffect $ Ref.read refAccum
+                        success = checkFn size (map (\{ input, output } -> input /\ output) results_)
+                      in
+                        { groupName, size, success, results }
+                  )
 
-        pure do
-          checkInputs <- groupOpts.checkInputs
-          Just $ map
-            ( \(size /\ { inputs }) ->
-                { groupName
-                , size
-                , success: checkInputs size (map _.value inputs)
-                , results: map (\{ benchName, value } -> { benchName, showedVal: map (\f -> f value) groupOpts.printInput }) inputs
-                }
-            )
-            (Map.toUnfoldable accum)
+        pure ret
     }
 
 -- | Create a benchmark group of a given name.
@@ -393,10 +390,9 @@ group groupName mkGroupOpts benches_ =
               pure benchResult
           )
 
-        checkOutputsResults <- perSizeItf.getCheckOutputsResults
-        checkInputsResults <- perSizeItf.getCheckOutputsResults
+        checkResults <- perSizeItf.getCheckResults
 
-        let groupResult = { groupName, benchResults, checkOutputsResults, checkInputsResults }
+        let groupResult = { groupName, benchResults, checkResults }
 
         reporter.onGroupFinish groupResult
 
@@ -427,9 +423,10 @@ benchAff benchName mkBenchOpts prepareInput benchFn =
         pure { sampleResult, output: pure output, input: pure input }
     }
 
-type ResultPerSize a b =
-  { inputs :: Array { value :: a, benchName :: String }
-  , outputs :: Array { value :: b, benchName :: String }
+type ResultPerSize a b = Array
+  { input :: a
+  , output :: b
+  , benchName :: String
   }
 
 -- Normalization
@@ -533,6 +530,9 @@ asciColorStr color str =
 bgGray :: Int
 bgGray = 100
 
+bold :: Int
+bold = 1
+
 -- Reporter
 
 -- | Default reporter useful for selective overriding.
@@ -554,27 +554,60 @@ defaultReporter =
 reportConsole :: Reporter
 reportConsole = defaultReporter
   { onSuiteStart = \name -> Console.log
-      ("• suite: " <> name)
+      (asciColorStr bold ("• Suite: " <> name))
 
   , onGroupStart = \name -> Console.log
-      ("  • group: " <> name)
+      (asciColorStr bold ("  • Group: " <> name))
 
   , onBenchStart = \benchName -> Console.log
-      ("    • " <> (asciColorStr bgGray ("bench: " <> benchName)))
+      (asciColorStr bold "    • " <> (asciColorStr bold $ asciColorStr bgGray ("Bench: " <> benchName)))
+
+  , onBenchFinish = \_ -> Console.log ""
+
+  , onGroupFinish = \_ -> Console.log ""
 
   , onSampleFinish = \{ size, average, iterations } -> Console.log
-      ( "      • " <> printStats
-          [ "size" /\ Int.toStringAs Int.decimal size
-          , "count" /\ Int.toStringAs Int.decimal iterations
-          , "avg" /\ printMs average
+      ( asciColorStr bold "      • " <> printStats " "
+          [ "size" /\ Int.toStringAs Int.decimal size /\ Nothing
+          , "count" /\ Int.toStringAs Int.decimal iterations /\ Nothing
+          , "avg" /\ printMs average /\ Just "ms"
           ]
       )
 
-  , onSuiteFinish = \_ -> Console.log "Suite finished"
+  , onSuiteFinish = \suiteResult -> do
+      let summary = getSummary suiteResult
+      Console.log $ asciColorStr bold "Suite finished"
+      Console.log
+        ( printStats "\n"
+            [ "groups" /\ Int.toStringAs Int.decimal summary.countGroups /\ Nothing
+            , "checked" /\ Int.toStringAs Int.decimal summary.countCheckedGroups /\ Nothing
+            , "failed" /\ Int.toStringAs Int.decimal summary.countFailedGroups /\ Nothing
+            ]
+        )
   }
 
-printStats :: Array (String /\ String) -> String
-printStats stats = Str.joinWith ", " (map (\(k /\ v) -> k <> "=" <> v) stats)
+getSummary :: SuiteResult -> Summary
+getSummary { groupResults } =
+  let
+    checkedBenchs = groupResults
+      # filterMap (\{ checkResults } -> checkResults)
+
+    failedBenchs = checkedBenchs
+      # filter (\results -> all (\{ success } -> not success) results)
+  in
+    { countGroups: Array.length groupResults
+    , countCheckedGroups: Array.length checkedBenchs
+    , countFailedGroups: Array.length failedBenchs
+    }
+
+type Summary =
+  { countGroups :: Int
+  , countCheckedGroups :: Int
+  , countFailedGroups :: Int
+  }
+
+printStats :: String -> Array (String /\ String /\ Maybe String) -> String
+printStats sep stats = Str.joinWith sep (map (\(k /\ v /\ un) -> k <> "=" <> asciColorStr bold v <> fromMaybe "" un) stats)
 
 printMs :: Milliseconds -> String
-printMs (Milliseconds ms) = NumFmt.toStringWith (NumFmt.fixed 4) ms <> "ms"
+printMs (Milliseconds ms) = NumFmt.toStringWith (NumFmt.fixed 4) ms
