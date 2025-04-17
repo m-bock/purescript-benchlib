@@ -51,6 +51,7 @@ import Data.String as Str
 import Data.Time.Duration (Milliseconds(..))
 import Data.Traversable (for)
 import Data.Tuple.Nested (type (/\), (/\))
+import Data.Unfoldable (range)
 import Data.Unfoldable1 (replicate1A)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
@@ -408,7 +409,9 @@ bench benchName mkOpts { prepare, run } =
             input = prepare size
 
           duration <- measureTime \_ -> do
-            pure $ replicate iterations (run input)
+            for_ (range 0 iterations :: Array _) \_ -> do
+              let _output = run input
+              pure unit
 
           let average = Milliseconds (unwrap duration / Int.toNumber iterations)
 
