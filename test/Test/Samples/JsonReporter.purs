@@ -4,7 +4,7 @@ module Test.Samples.JsonReporter (main) where
 
 import Prelude
 
-import BenchLib (basic, group_, suite, bench_)
+import BenchLib (group_, suite, bench_)
 import BenchLib as BenchLib
 import BenchLib.Reporters.Json (reportJson)
 import Data.Array as Array
@@ -36,14 +36,16 @@ main =
         )
         [ group_
             "Replicate functions"
-            [ basic $ bench_
+            [ bench_
                 "Array"
-                identity
-                (\size -> Array.replicate size 'x')
+                { prepare: identity
+                , run: \size -> Array.replicate size 'x'
+                }
 
-            , basic $ bench_
+            , bench_
                 "Lazy List"
-                identity
-                (\size -> LazyList.replicate size 'x')
+                { prepare: identity
+                , run: \size -> LazyList.replicate size 'x'
+                }
             ]
         ]

@@ -2,10 +2,9 @@ module Test.Samples.PrepareFunction where
 
 import Prelude
 
-import BenchLib (basic, bench_, group_, suite_)
+import BenchLib (bench_, group_, suite_)
 import BenchLib as BenchLib
 import Data.Array as Array
-import Data.List (List)
 import Data.List as List
 import Data.Unfoldable (replicate)
 import Effect (Effect)
@@ -17,15 +16,17 @@ main =
       "Sample"
 
       [ group_ "Get last element"
-          [ basic $ bench_
+          [ bench_
               "List"
-              (\(size :: Int) -> replicate size 'x')
-              (\(items :: List Char) -> List.last items)
+              { prepare: \size -> replicate size 'x'
+              , run: \items -> List.last items
+              }
 
-          , basic $ bench_
+          , bench_
               "Array"
-              (\(size :: Int) -> replicate size 'x')
-              (\(items :: Array Char) -> Array.last items)
+              { prepare: \size -> replicate size 'x'
+              , run: \items -> Array.last items
+              }
           ]
       ]
 

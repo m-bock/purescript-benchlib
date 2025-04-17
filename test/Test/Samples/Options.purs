@@ -2,7 +2,7 @@ module Test.Samples.Options where
 
 import Prelude
 
-import BenchLib (basic, bench, group, suite)
+import BenchLib (bench, group, suite)
 import BenchLib as BenchLib
 import Data.Array as Array
 import Data.List as List
@@ -24,23 +24,25 @@ main = BenchLib.runNode_ $
             , sizes = [ 20_000, 40_000, 80_000 ]
             }
         )
-        [ basic $ bench
+        [ bench
             "Create a range of numbers in an array"
             ( \cfg -> cfg
                 { iterations = 1000
                 }
             )
-            identity
-            (\size -> Array.range 0 size)
+            { prepare: identity
+            , run: \size -> Array.range 0 size
+            }
 
-        , basic $ bench
+        , bench
             "Create a range of numbers in a list"
             ( \cfg -> cfg
                 { iterations = 1000
                 }
             )
-            identity
-            (\size -> List.range 0 size)
+            { prepare: identity
+            , run: \size -> List.range 0 size
+            }
         ]
     ]
 

@@ -2,7 +2,7 @@ module Test.Samples.Normalize where
 
 import Prelude
 
-import BenchLib (bench_, group, normalize, suite_)
+import BenchLib (bench, benchAff, bench_, group, suite_)
 import BenchLib as BenchLib
 import Data.Array as Array
 import Data.Foldable (all)
@@ -16,6 +16,8 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (range)
 import Effect (Effect)
+import Effect.Class (liftEffect)
+import Effect.Ref as Ref
 
 main :: Effect Unit
 main =
@@ -31,27 +33,63 @@ main =
 
               }
           )
-          [ bench_
+          [ bench
               "List"
-              (\(size :: Int) -> range 0 size)
-              (\(items :: List Int) -> List.reverse items)
-              # normalize List.toUnfoldable List.toUnfoldable
+              ( \opts -> opts
+                  { normIn = List.toUnfoldable
+                  , normOut = List.toUnfoldable
+                  }
+              )
+              { prepare: \size -> range 0 size
+              , run: \items -> List.reverse items
+              }
 
-          , bench_
+          , bench
               "NonEmptyList"
-              (\(size :: Int) -> range 0 size)
-              (\(items :: NonEmptyList Int) -> NEL.reverse items)
-              # normalize NEL.toUnfoldable NEL.toUnfoldable
+              ( \opts -> opts
+                  { normIn = NEL.toUnfoldable
+                  , normOut = NEL.toUnfoldable
+                  }
+              )
+              { prepare: \size -> range 0 size
+              , run: \items -> NEL.reverse items
+              }
 
-          , bench_
+          , bench
               "Lazy List"
-              (\(size :: Int) -> range 0 size)
-              (\(items :: Lazy.List Int) -> LazyList.reverse items)
-              # normalize LazyList.toUnfoldable LazyList.toUnfoldable
+              ( \opts -> opts
+                  { normIn = LazyList.toUnfoldable
+                  , normOut = LazyList.toUnfoldable
+                  }
+              )
+              { prepare: \size -> range 0 size
+              , run: \items -> LazyList.reverse items
+              }
 
-          , bench_
+          , bench
               "Array"
-              (\(size :: Int) -> range 0 size)
-              (\(items :: Array Int) -> Array.reverse items)
+              ( \opts -> opts
+                  { normIn = identity
+                  , normOut = identity
+                  }
+              )
+              { prepare: \size -> range 0 size
+              , run: \items -> Array.reverse items
+              }
+
+          , benchAff
+              "Array"
+              ( \opts -> opts
+                  { iterations = 1
+                  , normIn = \ref -> liftEffect $ Ref.read ref
+                  , normOut = \ref -> liftEffect $ Ref.read ref
+                  }
+              )
+              { prepare: \size -> liftEffect $ Ref.new (range 0 size)
+              , run: \ref -> liftEffect do
+                  --Ref.modify_ Array.reverse ref
+                  pure ref
+              }
+
           ]
       ]
