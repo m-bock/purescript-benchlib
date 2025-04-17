@@ -44,12 +44,13 @@ import Data.Array (filter, foldr)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.DateTime.Instant (unInstant)
+import Data.Either (Either)
 import Data.Filterable (filterMap)
-import Data.Foldable (all)
+import Data.Foldable (all, for_)
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Newtype (unwrap)
 import Data.Number.Format as NumFmt
 import Data.String as Str
@@ -564,10 +565,21 @@ reportConsole = defaultReporter
 
   , onBenchFinish = \_ -> Console.log ""
 
-  , onGroupFinish = \_ -> Console.log ""
+  , onGroupFinish = \groupResult@{ checkResults } -> do
+      let { checked } = getGroupSummary groupResult
+
+      let
+        msg = case checked of
+          Nothing -> "⚠ not checked"
+          Just Nothing -> "✔ check success"
+          Just xs -> "✖ check failure for sizes " <> show (map (_.size) xs)
+
+      Console.log ("    " <> asciColorStr bold msg <> "\n")
+
+      Console.log ("")
 
   , onSampleFinish = \{ size, average, iterations } -> Console.log
-      ( asciColorStr bold "      • " <> printStats " "
+      ( asciColorStr bold "      » " <> printStats " "
           [ "size" /\ Int.toStringAs Int.decimal size /\ Nothing
           , "count" /\ Int.toStringAs Int.decimal iterations /\ Nothing
           , "avg" /\ printMs average /\ Just "ms"
@@ -575,7 +587,35 @@ reportConsole = defaultReporter
       )
 
   , onSuiteFinish = \suiteResult -> do
-      let summary = getSummary suiteResult
+      let summary = getSuiteSummary suiteResult
+      let
+        firstFailure = suiteResult.groupResults
+          # map getGroupSummary
+          # Array.findMap
+              ( \{ checked } -> case checked of
+                  Just (Just val) -> Just val
+                  Just Nothing -> Nothing
+                  Nothing -> Nothing
+              )
+
+      for_ firstFailure \{ size, groupName, results } -> do
+        Console.log
+          $ asciColorStr bold ( "Check failure for size " <> show size  <> " in group \"" <> groupName <> "\"")
+        Console.log ""
+
+        for_ results \{ benchName, showedInput, showedOutput } -> do
+          Console.log $ asciColorStr bold ( benchName <> ":")
+          for_ showedInput \input -> do
+            Console.log ( "input:")
+            Console.log input
+            Console.log ""
+          for_ showedOutput \output -> do
+            Console.log ( "output:")
+            Console.log output
+            Console.log ""
+
+        Console.log ""
+
       Console.log $ asciColorStr bold "Suite finished"
       Console.log
         ( printStats "\n"
@@ -586,8 +626,8 @@ reportConsole = defaultReporter
         )
   }
 
-getSummary :: SuiteResult -> Summary
-getSummary { groupResults } =
+getSuiteSummary :: SuiteResult -> SuiteSummary
+getSuiteSummary { groupResults } =
   let
     checkedBenchs = groupResults
       # filterMap (\{ checkResults } -> checkResults)
@@ -600,10 +640,21 @@ getSummary { groupResults } =
     , countFailedGroups: Array.length failedBenchs
     }
 
-type Summary =
+getGroupSummary :: GroupResult -> GroupSummary
+getGroupSummary { checkResults } =
+  { checked: checkResults # map \xs -> xs
+      # Array.sortWith _.size
+      # Array.find (not <<< _.success)
+  }
+
+type SuiteSummary =
   { countGroups :: Int
   , countCheckedGroups :: Int
   , countFailedGroups :: Int
+  }
+
+type GroupSummary =
+  { checked :: Maybe (Maybe CheckResults)
   }
 
 printStats :: String -> Array (String /\ String /\ Maybe String) -> String
