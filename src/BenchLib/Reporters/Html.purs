@@ -13,8 +13,11 @@ import BenchLib.Reporters.Json (codecSuiteResult)
 import Data.Argonaut as Json
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
+import Data.Codec.Argonaut.Compat as CAP
 import Data.Codec.Argonaut.Record as CAR
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap, wrap)
+import Data.Profunctor (dimap)
 import Data.String (Pattern(..))
 import Data.String as Str
 import Data.String.Regex as Regex
@@ -73,6 +76,7 @@ writeHtml opts suiteResults = do
     config =
       { lineStyles: opts.lineStyles
       , data: suiteResults
+      , minSpeed: opts.minSpeed
       }
 
   let jsonStr = Json.stringifyWithIndent 2 $ CA.encode codecConfig config
@@ -112,12 +116,14 @@ indent indentStr str = Str.split (Pattern pat) str # map (indentStr <> _) # Str.
 type Config =
   { lineStyles :: Array LineStyle
   , data :: SuiteResult
+  , minSpeed :: Maybe Milliseconds
   }
 
 codecConfig :: JsonCodec Config
 codecConfig = CAR.object "Config"
   { lineStyles: CA.array codecLineStyle
   , data: codecSuiteResult
+  , minSpeed: CAP.maybe codecMilliseconds
   }
 
 codecLineStyle :: JsonCodec LineStyle
@@ -134,8 +140,12 @@ codecColor = CAR.object "Color"
   , b: CA.int
   }
 
+codecMilliseconds :: JsonCodec Milliseconds
+codecMilliseconds = dimap unwrap wrap CA.number
+
 template :: String
-template = """
+template =
+  """
 <!DOCTYPE html>
 <html lang="en">
   <head>
