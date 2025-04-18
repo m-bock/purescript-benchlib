@@ -759,7 +759,20 @@
         "zipperarray": "2.0.0"
       }
     },
-    "extra_packages": {}
+    "extra_packages": {
+      "codec-argonaut": {
+        "git": "https://github.com/garyb/purescript-codec-argonaut.git",
+        "ref": "78b0171958a4f21ed23946fe7e574ea5018902d9",
+        "dependencies": [
+          "argonaut-core",
+          "codec",
+          "foreign-object",
+          "ordered-collections",
+          "type-equality",
+          "variant"
+        ]
+      }
+    }
   },
   "packages": {
     "aff": {
@@ -927,9 +940,9 @@
       ]
     },
     "codec-argonaut": {
-      "type": "registry",
-      "version": "10.0.0",
-      "integrity": "sha256-n80U8KiBk333qfQwDobSZWiyNg9BA3CL/EwFznIdRwI=",
+      "type": "git",
+      "url": "https://github.com/garyb/purescript-codec-argonaut.git",
+      "rev": "78b0171958a4f21ed23946fe7e574ea5018902d9",
       "dependencies": [
         "argonaut-core",
         "codec",

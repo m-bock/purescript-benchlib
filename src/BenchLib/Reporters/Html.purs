@@ -14,11 +14,13 @@ import Data.Argonaut as Json
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
+import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..))
 import Data.String as Str
 import Data.String.Regex as Regex
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
+import Data.Time.Duration (Milliseconds)
 import Data.Traversable (foldl)
 import Effect (Effect)
 import Effect.Class (liftEffect)
@@ -29,6 +31,7 @@ import Node.FS.Sync as FS
 type Opts =
   { lineStyles :: Array LineStyle
   , filePath :: String
+  , minSpeed :: Maybe Milliseconds
   }
 
 type LineStyle =
@@ -58,6 +61,7 @@ defaultOpts =
       , { color: { r: 255, g: 159, b: 64 }, opacity, width }
       ]
   , filePath: "bench-results.html"
+  , minSpeed: Nothing
   }
   where
   opacity = 0.5
@@ -326,7 +330,7 @@ template = """
                       ...ctx.chart.data.datasets.flatMap((ds) => ds.data.map((d) => d.y))
                     );
                     console.log(ctx.chart.data.datasets);
-                    return Math.max(maxValue, 10);
+                    return Math.max(maxValue, config.minSpeed || maxValue);
                   },
                   min: 0,
                   title: {

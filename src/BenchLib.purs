@@ -5,8 +5,9 @@ module BenchLib
   , BenchBaseOptsAff
   , BenchOptsAff
   , BenchResult
-  , CheckResult
-  , CheckResults
+  , CheckResult(..)
+  , SizeCheckResult
+  , BenchCheckResult
   , Group
   , GroupOpts
   , GroupResult
@@ -35,12 +36,15 @@ module BenchLib
 
 import Prelude
 
-import Data.Array (filter, foldr, replicate)
+import Data.Array (filter, foldr)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.DateTime.Instant (unInstant)
+import Data.Either (Either(..), isLeft)
 import Data.Filterable (filterMap)
-import Data.Foldable (all, for_)
+import Data.Foldable (all, findMap, for_)
+import Data.FoldableWithIndex (findMapWithIndex)
+import Data.Generic.Rep (class Generic)
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
@@ -61,6 +65,7 @@ import Effect.Now (now)
 import Effect.Ref as Ref
 import Node.Process as Process
 import Prim.TypeError (class Warn, Text)
+import Unsafe.Coerce (unsafeCoerce)
 
 --- Type Aliases
 
@@ -114,8 +119,17 @@ type SuiteResult =
 type GroupResult =
   { groupName :: String
   , benchResults :: Array BenchResult
-  , checkResults :: Maybe (Array CheckResults)
+  , checkResult :: CheckResult
   }
+
+data CheckResult
+  = NotChecked
+  | CheckedSuccess
+  | CheckedFailure { firstFailure :: SizeCheckResult }
+
+derive instance Eq CheckResult
+
+derive instance Generic CheckResult _
 
 -- | The result of a benchmark.
 type BenchResult =
@@ -130,14 +144,13 @@ type SampleResult =
   , average :: Milliseconds
   }
 
-type CheckResults =
+type SizeCheckResult =
   { groupName :: String
-  , success :: Boolean
   , size :: Size
-  , results :: Array CheckResult
+  , benchResult :: Array BenchCheckResult
   }
 
-type CheckResult =
+type BenchCheckResult =
   { showedInput :: Maybe String
   , showedOutput :: Maybe String
   , benchName :: String
@@ -289,22 +302,18 @@ suite suiteName mkSuiteOpts groups_ = Suite
 isSuccess :: Array GroupResult -> Boolean
 isSuccess groupResults =
   let
-    checkResults = groupResults
-      # map
-          ( \{ checkResults } -> case checkResults of
-              Just xs -> xs
-              Nothing -> []
-          )
-      # join
-
-    failures = filter (\{ success } -> not success) checkResults
-    nFailures = Array.length failures
+    failures = filter
+      ( _.checkResult >>> case _ of
+          CheckedFailure _ -> true
+          _ -> false
+      )
+      groupResults
   in
-    nFailures == 0
+    Array.length failures == 0
 
 type PerSizeItf a b =
   { addEntry :: { size :: Size, benchName :: String, input :: a, output :: b } -> Aff Unit
-  , getCheckResults :: Aff (Maybe (Array CheckResults))
+  , getCheckResults :: Aff CheckResult
   }
 
 mkPerSizeItf :: forall a b. GroupName -> GroupOpts a b -> Aff (PerSizeItf a b)
@@ -320,28 +329,46 @@ mkPerSizeItf groupName groupOpts@{ printInput, printOutput } = liftEffect do
     , getCheckResults: do
         accum <- liftEffect $ Ref.read refAccum
 
-        let
-          ret = groupOpts.check # map \checkFn ->
-            Map.toUnfoldable accum
-              # map
-                  ( \(size /\ results_) ->
-                      let
-                        results = map
-                          ( \{ benchName, input, output } ->
-                              { benchName
-                              , showedInput: map (_ $ input) printInput
-                              , showedOutput: map (_ $ output) printOutput
-                              }
-                          )
-                          results_
-
-                        success = checkFn size (map (\{ input, output } -> input /\ output) results_)
-                      in
-                        { groupName, size, success, results }
-                  )
-
-        pure ret
+        pure $ mkCheckResult accum
     }
+
+  where
+  mkCheckResult :: Map Size (ResultPerSize a b) -> CheckResult
+  mkCheckResult mp = case groupOpts.check of
+    Nothing -> NotChecked
+    Just check ->
+      let
+        mayResult :: Maybe { firstFailure :: SizeCheckResult }
+        mayResult = mp
+          # findMapWithIndex
+              ( \size r ->
+                  let
+                    isSuccess = check size (map (\{ input, output } -> input /\ output) r)
+                  in
+                    if isSuccess then Nothing
+                    else Just
+                      { firstFailure: mkSizeCheckResult size r
+                      }
+              )
+      in
+        case mayResult of
+          Nothing -> CheckedSuccess
+          Just x -> CheckedFailure x
+
+    where
+    mkSizeCheckResult :: Size -> Array { benchName ∷ String, input ∷ a, output ∷ b } -> SizeCheckResult
+    mkSizeCheckResult size r =
+      { size
+      , groupName
+      , benchResult: map
+          ( \{ benchName, input, output } ->
+              { benchName
+              , showedInput: map (\f -> f input) groupOpts.printInput
+              , showedOutput: map (\f -> f output) groupOpts.printOutput
+              }
+          )
+          r
+      }
 
 -- | Create a benchmark group of a given name.
 -- | The group will be run with the provided options.
@@ -387,9 +414,9 @@ group groupName mkGroupOpts benches_ =
               pure benchResult
           )
 
-        checkResults <- perSizeItf.getCheckResults
+        checkResult <- perSizeItf.getCheckResults
 
-        let groupResult = { groupName, benchResults, checkResults }
+        let groupResult = { groupName, benchResults, checkResult }
 
         reporter.onGroupFinish groupResult
 
@@ -594,14 +621,12 @@ reportConsole = defaultReporter
 
   , onBenchFinish = \_ -> Console.log ""
 
-  , onGroupFinish = \groupResult@{ checkResults } -> do
-      let { checked } = getGroupSummary groupResult
-
+  , onGroupFinish = \{ checkResult } -> do
       let
-        msg = case checked of
-          Nothing -> "⚠ not checked"
-          Just Nothing -> "✔ check success"
-          Just (Just { size }) -> "✖ check failure for sizes " <> show size
+        msg = case checkResult of
+          NotChecked -> "⚠ not checked"
+          CheckedSuccess -> "✔ check success"
+          CheckedFailure { firstFailure: { size } } -> "✖ check failure for sizes " <> show size
 
       Console.log ("    " <> asciColorStr bold msg <> "\n")
 
@@ -618,21 +643,19 @@ reportConsole = defaultReporter
   , onSuiteFinish = \suiteResult -> do
       let summary = getSuiteSummary suiteResult
       let
-        firstFailure = suiteResult.groupResults
-          # map getGroupSummary
+        firstGroupFailure = suiteResult.groupResults
           # Array.findMap
-              ( \{ checked } -> case checked of
-                  Just (Just val) -> Just val
-                  Just Nothing -> Nothing
-                  Nothing -> Nothing
+              ( \{ checkResult } -> case checkResult of
+                  CheckedFailure val -> Just val.firstFailure
+                  _ -> Nothing
               )
 
-      for_ firstFailure \{ size, groupName, results } -> do
+      for_ firstGroupFailure \{ size, groupName, benchResult } -> do
         Console.log
           $ asciColorStr bold ("Check failure for size " <> show size <> " in group \"" <> groupName <> "\"")
         Console.log ""
 
-        for_ results \{ benchName, showedInput, showedOutput } -> do
+        for_ benchResult \{ benchName, showedInput, showedOutput } -> do
           Console.log $ asciColorStr bold (benchName <> ":")
           Console.log ("input:")
           Console.log case showedInput of
@@ -646,7 +669,7 @@ reportConsole = defaultReporter
             Nothing -> asciColorStr italics "Not printable. Provide `printOutput` option."
           Console.log ""
 
-        Console.log ""
+      Console.log ""
 
       Console.log $ asciColorStr bold "Suite finished"
       Console.log
@@ -661,23 +684,20 @@ reportConsole = defaultReporter
 getSuiteSummary :: SuiteResult -> SuiteSummary
 getSuiteSummary { groupResults } =
   let
-    checkedBenchs = groupResults
-      # filterMap (\{ checkResults } -> checkResults)
+    checked = groupResults
+      # filter (\{ checkResult } -> checkResult /= NotChecked)
 
-    failedBenchs = checkedBenchs
-      # filter (\results -> all (\{ success } -> not success) results)
+    failures = filter
+      ( _.checkResult >>> case _ of
+          CheckedFailure _ -> true
+          _ -> false
+      )
+      groupResults
   in
     { countGroups: Array.length groupResults
-    , countCheckedGroups: Array.length checkedBenchs
-    , countFailedGroups: Array.length failedBenchs
+    , countCheckedGroups: Array.length checked
+    , countFailedGroups: Array.length failures
     }
-
-getGroupSummary :: GroupResult -> GroupSummary
-getGroupSummary { checkResults } =
-  { checked: checkResults # map \xs -> xs
-      # Array.sortWith _.size
-      # Array.find (not <<< _.success)
-  }
 
 type SuiteSummary =
   { countGroups :: Int
@@ -685,9 +705,9 @@ type SuiteSummary =
   , countFailedGroups :: Int
   }
 
-type GroupSummary =
-  { checked :: Maybe (Maybe CheckResults)
-  }
+-- type GroupSummary =
+--   { checked :: Maybe (Maybe CheckResults)
+--   }
 
 printStats :: String -> Array (String /\ String /\ Maybe String) -> String
 printStats sep stats = Str.joinWith sep (map (\(k /\ v /\ un) -> k <> "=" <> asciColorStr bold v <> fromMaybe "" un) stats)

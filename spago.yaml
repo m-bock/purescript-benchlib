@@ -44,4 +44,14 @@ package:
 workspace:
   packageSet:
     registry: 64.1.0
-  extraPackages: {}
+  extraPackages:
+    codec-argonaut:
+      git: "https://github.com/garyb/purescript-codec-argonaut.git"
+      ref: "78b0171958a4f21ed23946fe7e574ea5018902d9"
+      dependencies:
+        - argonaut-core
+        - codec
+        - variant
+        - ordered-collections
+        - type-equality
+        - foreign-object

@@ -1,0 +1,64 @@
+{
+  "groupResults": [
+    {
+      "benchResults": [
+        {
+          "benchName": "Array",
+          "samples": [
+            {
+              "average": 0,
+              "iterations": 1,
+              "size": 0
+            },
+            {
+              "average": 0,
+              "iterations": 1,
+              "size": 20000
+            },
+            {
+              "average": 1,
+              "iterations": 1,
+              "size": 40000
+            },
+            {
+              "average": 1,
+              "iterations": 1,
+              "size": 80000
+            }
+          ]
+        },
+        {
+          "benchName": "Lazy List",
+          "samples": [
+            {
+              "average": 0,
+              "iterations": 1,
+              "size": 0
+            },
+            {
+              "average": 0,
+              "iterations": 1,
+              "size": 20000
+            },
+            {
+              "average": 0,
+              "iterations": 1,
+              "size": 40000
+            },
+            {
+              "average": 0,
+              "iterations": 1,
+              "size": 80000
+            }
+          ]
+        }
+      ],
+      "checkResult": {
+        "tag": "NotChecked",
+        "values": []
+      },
+      "groupName": "Replicate functions"
+    }
+  ],
+  "suiteName": "Sample"
+}

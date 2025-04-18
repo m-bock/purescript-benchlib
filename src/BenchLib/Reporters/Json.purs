@@ -7,13 +7,13 @@ module BenchLib.Reporters.Json
 
 import Prelude
 
-import BenchLib (BenchResult, CheckResults, GroupResult, Reporter, SampleResult, SuiteResult, CheckResult, defaultReporter)
+import BenchLib (BenchResult, CheckResult, GroupResult, Reporter, SampleResult, SizeCheckResult, SuiteResult, BenchCheckResult, defaultReporter)
 import Data.Argonaut (stringifyWithIndent)
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Common as CAC
-import Data.Codec.Argonaut.Compat as CAP
 import Data.Codec.Argonaut.Record as CAR
+import Data.Codec.Argonaut.Sum as CAS
 import Data.Newtype (unwrap, wrap)
 import Data.Profunctor (dimap)
 import Data.Time.Duration (Milliseconds)
@@ -63,7 +63,7 @@ codecGroupResult :: JsonCodec GroupResult
 codecGroupResult = CAR.object "GroupResult"
   { groupName: CA.string
   , benchResults: CA.array codecBenchResult
-  , checkResults: CAP.maybe (CA.array codecCheckResults)
+  , checkResult: codecCheckResult
   }
 
 codecBenchResult :: JsonCodec BenchResult
@@ -72,16 +72,24 @@ codecBenchResult = CAR.object "BenchResult"
   , samples: CA.array codecSampleResult
   }
 
-codecCheckResults :: JsonCodec CheckResults
-codecCheckResults = CAR.object "CheckResults"
-  { success: CA.boolean
-  , size: CA.int
-  , groupName: CA.string
-  , results: CA.array codecCheckResult
+codecCheckResult :: JsonCodec CheckResult
+codecCheckResult = CAS.sum "CheckResult"
+  { "NotChecked": unit
+  , "CheckedSuccess": unit
+  , "CheckedFailure": CAR.object "CheckedFailure fields"
+      { firstFailure: codecSizeCheckResult
+      }
   }
 
-codecCheckResult :: JsonCodec CheckResult
-codecCheckResult = CAR.object "CheckResult"
+codecSizeCheckResult :: JsonCodec SizeCheckResult
+codecSizeCheckResult = CAR.object "SizeCheckResult"
+  { groupName: CA.string
+  , size: CA.int
+  , benchResult: CA.array codecBenchCheckResult
+  }
+
+codecBenchCheckResult :: JsonCodec BenchCheckResult
+codecBenchCheckResult = CAR.object "BenchCheckResult"
   { showedInput: CAC.maybe CA.string
   , showedOutput: CAC.maybe CA.string
   , benchName: CA.string
