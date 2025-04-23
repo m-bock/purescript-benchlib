@@ -9,6 +9,7 @@
   - [Options](#options-1)
   - [Normalization](#normalization)
 - [Suites](#suites)
+  - [Options](#options-2)
   - [Runners](#runners)
   - [Reporters](#reporters)
     - [Console](#console)
@@ -234,7 +235,7 @@ group1 = BL.group_
 
 <!-- PD_END -->
 
-Here we use the `group_` function which takes a string (the name of the group) and an array of benchmarks. The return type of `group_` is simply a `Group`.
+Here we use the `group_` function which takes a string (the name of the group) and an array of uniformly typed benchmarks. The return type of `group_` is simply a `Group`.
 
 <!-- PD_START:purs
 filePath: src/BenchLib.purs
@@ -300,7 +301,76 @@ type GroupOpts a b =
 
 # Suites
 
+<!-- PD_START:purs
+filePath: test/Test/Doc.purs
+pick:
+  - suite1
+-->
+
+```purescript
+suite1 :: Suite
+suite1 = BL.suite_
+  "My Benchmarks"
+  [ group1
+  ]
+```
+
+<!-- PD_END -->
+
+The `suite_` function is trivial, it's signature is as follows:
+
+<!-- PD_START:purs
+filePath: src/BenchLib.purs
+pick:
+  - tag: signature
+    name: suite_
+-->
+
+```purescript
+suite_ :: String -> Array Group -> Suite
+```
+
+<!-- PD_END -->
+
+## Options
+
+Once again, there is a `suite` function that allows to define further options for the suite.
+
+<!-- PD_START:purs
+filePath: src/BenchLib.purs
+pick:
+  - tag: signature
+    name: suite
+-->
+
+```purescript
+suite :: String -> (SuiteOpts -> SuiteOpts) -> Array Group -> Suite
+```
+
+<!-- PD_END -->
+
+Suite options are defined in the `SuiteOpts` record:
+
+<!-- PD_START:purs
+filePath: src/BenchLib.purs
+pick:
+  - SuiteOpts
+-->
+
+```purescript
+type SuiteOpts =
+  { sizes :: Array Size
+  , iterations :: Int
+  }
+```
+
+Here you can define sizes and iterations globally for all groups in the suite. They'll only be used if not overwritten in the group or benchmark options.
+
+<!-- PD_END -->
+
 ## Runners
+
+### Node
 
 ## Reporters
 
