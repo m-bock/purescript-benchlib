@@ -7,20 +7,21 @@
   - [Options](#options)
 - [Groups](#groups)
   - [Options](#options-1)
-  - [Normalization](#normalization)
+  - [🚧 Normalization](#-normalization)
 - [Suites](#suites)
   - [Options](#options-2)
   - [Runners](#runners)
+    - [🚧 Node](#-node)
   - [Reporters](#reporters)
-    - [Console](#console)
-    - [HTML](#html)
-    - [JSON](#json)
+    - [🚧 Console](#-console)
+    - [🚧 HTML](#-html)
+    - [🚧 JSON](#-json)
 - [Full Examples](#full-examples)
   - [Basic](#basic)
-- [Effectful Benchmarks](#effectful-benchmarks)
+  - [Advanced](#advanced)
+- [🚧 Effectful Benchmarks](#-effectful-benchmarks)
 - [Appendix](#appendix)
-  - [Module Imports](#module-imports)
-  - [Convenience Functions](#convenience-functions)
+  - [🚧 Module Imports](#-module-imports)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -297,9 +298,13 @@ type GroupOpts a b =
 - The `check` field is an optional function that checks whether the inputs and the outputs for each size are correct throughout all benchmarks in the group. It takes a size and an array of pairs of inputs and outputs, and returns a `Boolean`. If the function returns `false`, the benchmark will be marked as failed.
 - The `printInput` and `printOutput` fields are optional functions that print the input and output of the benchmark for each size. This is used in error messages only.
 
-## Normalization
+## 🚧 Normalization
+
+_section not yet written_
 
 # Suites
+
+A suite is a losely defined collection of groups.
 
 <!-- PD_START:purs
 filePath: test/Test/Doc.purs
@@ -364,25 +369,33 @@ type SuiteOpts =
   }
 ```
 
-Here you can define sizes and iterations globally for all groups in the suite. They'll only be used if not overwritten in the group or benchmark options.
-
 <!-- PD_END -->
 
 ## Runners
 
-### Node
+### 🚧 Node
+
+_section not yet written_
 
 ## Reporters
 
-### Console
+### 🚧 Console
 
-### HTML
+_section not yet written_
 
-### JSON
+### 🚧 HTML
+
+_section not yet written_
+
+### 🚧 JSON
+
+_section not yet written_
 
 # Full Examples
 
 ## Basic
+
+Here is a basic and full example that does not use any advanced features of **benchlib**.
 
 <!-- PD_START:purs
 filePath: test/Test/Doc.purs
@@ -418,10 +431,14 @@ fullExample1 = BL.runNode_ $
 
 <!-- PD_END -->
 
-# Effectful Benchmarks
+## Advanced
+
+# 🚧 Effectful Benchmarks
+
+_section not yet written_
 
 # Appendix
 
-## Module Imports
+## 🚧 Module Imports
 
-## Convenience Functions
+_section not yet written_
