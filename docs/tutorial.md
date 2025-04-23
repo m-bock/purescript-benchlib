@@ -2,12 +2,10 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [Benchmarks](#benchmarks)
-  - [Type Signatures](#type-signatures)
   - [Preparation Functions](#preparation-functions)
   - [Benchmark Definitions](#benchmark-definitions)
   - [Options](#options)
 - [Groups](#groups)
-  - [Basic](#basic)
   - [Options](#options-1)
   - [Normalization](#normalization)
 - [Suites](#suites)
@@ -17,7 +15,7 @@
     - [HTML](#html)
     - [JSON](#json)
 - [Full Examples](#full-examples)
-  - [Basic](#basic-1)
+  - [Basic](#basic)
 - [Effectful Benchmarks](#effectful-benchmarks)
 - [Appendix](#appendix)
   - [Module Imports](#module-imports)
@@ -28,8 +26,6 @@
 # Benchmarks
 
 In this tutorial, we'll use **benchlib** to compare the runtime performance of computing the length of three different PureScript collections: `Array`, `List`, and `String`.
-
-## Type Signatures
 
 Here are the type signatures of the functions we'll benchmark:
 
@@ -50,9 +46,11 @@ pick:
     prefix: '- '
 split: true
 -->
+
 - `length :: forall a. Array a -> Int`
 - `length :: forall a. List a -> Int`
 - `length :: String -> Int`
+
 <!-- PD_END -->
 
 Each function computes the number of elements in its respective collection type.
@@ -96,19 +94,43 @@ prepareString size = String.fromCharArray (Array.replicate size 'x')
 
 Each function takes a `Size` (an alias for `Int`) and returns a uniformly filled collection of that size using the character `'x'`.
 
-These functions will be fed with various sizes to prepare the input data for our benchmarks.
-
 ## Benchmark Definitions
+
+The following is the type signature of the `bench_` function, which is used to define a benchmark.
 
 <!-- PD_START:purs
 filePath: src/BenchLib.purs
-inline: true
 pick:
   - tag: signature
     name: bench_
 -->
-`bench_ :: forall a b. String -> BenchBaseOpts a b -> Bench Unit Unit`
+
+```purescript
+bench_ :: forall a b. String -> BenchBaseOpts a b -> Bench Unit Unit
+```
+
 <!-- PD_END -->
+
+As you can see, the `bench_` function takes a string (the name of the benchmark) and a `BenchBaseOpts` record. The `BenchBaseOpts` record is defined as follows:
+
+<!-- PD_START:purs
+filePath: src/BenchLib.purs
+pick:
+  - BenchBaseOpts
+-->
+
+```purescript
+type BenchBaseOpts a b =
+  { prepare :: Size -> a
+  , run :: a -> b
+  }
+```
+
+<!-- PD_END -->
+
+The return type of `bench_` is a `Bench Unit Unit`. We'll come back to the `Bench` type later. the two `Unit` parameters signalize that input and output of the benchmark are not obvervable from the outside. They will make more sense when normalization is introduced.
+
+Let's have a look the three benchmarks we want to define:
 
 <!-- PD_START:purs
 filePath: test/Test/Doc.purs
@@ -143,7 +165,12 @@ bench3 = BL.bench_
 
 <!-- PD_END -->
 
+Since they all have the same type, they can be easily grouped together as we will see in one of the next sections.
+
 ## Options
+
+But first let's have a look at a more powerful version of the `bench_` function.
+The following is the type signature of the `bench` function, which is used to define a benchmark with options.
 
 <!-- PD_START:purs
 filePath: src/BenchLib.purs
@@ -163,6 +190,10 @@ bench
 
 <!-- PD_END -->
 
+First argument is again the name of the benchmark, the second argument is a function that takes a default `BenchOpts` record and returns a modified `BenchOpts` record. The third argument is the same as before, a mandatory `BenchBaseOpts` record.
+
+The `BenchOpts` record is defined as follows:
+
 <!-- PD_START:purs
 filePath: src/BenchLib.purs
 pick:
@@ -179,9 +210,11 @@ type BenchOpts a' b' a b =
 
 <!-- PD_END -->
 
+The `iterations` field specifies how many times the benchmark should be run in order to get a reliable result. The `normIn` and `normOut` fields are functions that normalize the input and output of the benchmark.
+
 # Groups
 
-## Basic
+A group is a collection of benchmarks that should be compared to each other. For example, we can group the three benchmarks we defined earlier into a single group called "Length operations".
 
 <!-- PD_START:purs
 filePath: test/Test/Doc.purs
@@ -201,7 +234,7 @@ group1 = BL.group_
 
 <!-- PD_END -->
 
-## Options
+Here we use the `group_` function which takes a string (the name of the group) and an array of benchmarks. The return type of `group_` is simply a `Group`.
 
 <!-- PD_START:purs
 filePath: src/BenchLib.purs
@@ -215,6 +248,30 @@ group_ :: forall a b. String -> Array (Bench a b) -> Group
 ```
 
 <!-- PD_END -->
+
+## Options
+
+In analogy to the `bench`/`bench_` functions, there is also a `group` function that allows to define further options for the group.
+
+<!-- PD_START:purs
+filePath: src/BenchLib.purs
+pick:
+  - tag: signature
+    name: group
+-->
+
+```purescript
+group
+  :: forall a b
+   . String
+  -> (GroupOpts a b -> GroupOpts a b)
+  -> Array (Bench a b)
+  -> Group
+```
+
+<!-- PD_END -->
+
+Whereas the `GroupOpts` record is defined as follows:
 
 <!-- PD_START:purs
 filePath: src/BenchLib.purs
@@ -233,6 +290,11 @@ type GroupOpts a b =
 ```
 
 <!-- PD_END -->
+
+- The `sizes` field specifies the different sizes to generate input data for the benchmarks. The benchmarks will be run for each size in the array.
+- The `iterations` field specifies how many times each benchmark should be run for each size. This field can be overridden by the `iterations` field in the `BenchOpts` record.
+- The `check` field is an optional function that checks whether the inputs and the outputs for each size are correct throughout all benchmarks in the group. It takes a size and an array of pairs of inputs and outputs, and returns a `Boolean`. If the function returns `false`, the benchmark will be marked as failed.
+- The `printInput` and `printOutput` fields are optional functions that print the input and output of the benchmark for each size. This is used in error messages only.
 
 ## Normalization
 
