@@ -2,28 +2,32 @@
 
 <img src="docs/logo.png" width="400"/>
 
-A simple and flexible benchmarking library for PureScript. 
+A simple and flexible benchmarking library for PureScript.
 
 ## Features
 
-- __Customizable Output__ – Choose between console logging, JSON reports, HTML or Markdown summaries with rendered charts.
+- **Customizable Output** – Choose between console logging, JSON reports, HTML or Markdown summaries with rendered charts.
 
-- __Flexible Benchmarking__ – Configure iterations, input sizes, and setup functions.
+- **Flexible Benchmarking** – Configure iterations, input sizes, and setup functions.
 
-- __Supports Pure & Effectful Functions__ – Benchmark any kind of computation.
+- **Supports Pure & Effectful Functions** – Benchmark any kind of computation.
 
-- __Just PureScript__ – No JavaScript libraries under the hood, ensuring full type safety.
+- **Just PureScript** – No JavaScript libraries under the hood, ensuring full type safety.
 
 <br>
 
-Focus on writing benchmarks, not boilerplate. 
+Focus on writing benchmarks, not boilerplate.
+
+## Documentation
+
+- [API Documentation](https://pursuit.purescript.org/packages/purescript-benchlib)
+- [Tutorial](docs/tutorial.md)
 
 ## Limitations
 
 - Currently, the library only supports Node.js. However, it's planned to add browser support in the future.
 
 - The library is still in its early stages, and we welcome contributions to improve it.
-
 
 ## Example to Get You Started
 
