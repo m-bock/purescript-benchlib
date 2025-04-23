@@ -57,4 +57,4 @@ workspace:
         - foreign-object
     patchdown:
       git: https://github.com/m-bock/purescript-patchdown.git
-      ref: 042b3d0849d880e6dbe82ccbac419342ad4e41b4
+      ref: ef4db1cc098e2a2bffe034795bc425d8e23cd9a1

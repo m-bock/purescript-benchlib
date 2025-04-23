@@ -8,15 +8,14 @@
   - [Options](#options)
 - [Groups](#groups)
   - [Basic](#basic)
-  - [Normalized](#normalized)
   - [Options](#options-1)
+  - [Normalization](#normalization)
 - [Suites](#suites)
-- [Runners](#runners)
-  - [Node](#node)
-- [Reporters](#reporters)
-  - [Console](#console)
-  - [HTML](#html)
-  - [JSON](#json)
+  - [Runners](#runners)
+  - [Reporters](#reporters)
+    - [Console](#console)
+    - [HTML](#html)
+    - [JSON](#json)
 - [Effectful Benchmarks](#effectful-benchmarks)
 - [Appendix](#appendix)
   - [Module Imports](#module-imports)
@@ -48,10 +47,11 @@ pick:
     filePath: .spago/p/strings-6.0.1/src/Data/String/CodePoints.purs
     prefix: '- '
 split: true
--->- `length :: forall a. Array a -> Int`
-
+-->
+- `length :: forall a. Array a -> Int`
 - `length :: forall a. List a -> Int`
-- `length :: String -> Int`<!-- PD_END -->
+- `length :: String -> Int`
+<!-- PD_END -->
 
 Each function computes the number of elements in its respective collection type.
 
@@ -94,41 +94,9 @@ prepareString size = String.fromCharArray (Array.replicate size 'x')
 
 Each function takes a `Size` (an alias for `Int`) and returns a uniformly filled collection of that size using the character `'x'`.
 
-We will benchmark these functions at varying sizes to analyze the performance trends.
+These functions will be fed with various sizes to prepare the input data for our benchmarks.
 
 ## Benchmark Definitions
-
-## Options
-
-# Groups
-
-## Basic
-
-## Normalized
-
-## Options
-
-# Suites
-
-## Runners
-
-## Reporters
-
-### Console
-
-### HTML
-
-### JSON
-
-# Effectful Benchmarks
-
-# Appendix
-
-## Module Imports
-
-## Convenience Functions
-
----
 
 <!-- PD_START:purs
 filePath: src/BenchLib.purs
@@ -136,7 +104,9 @@ inline: true
 pick:
   - tag: signature
     name: bench_
--->`bench_ :: forall a b. String -> BenchBaseOpts a b -> Bench Unit Unit`<!-- PD_END -->
+-->
+`bench_ :: forall a b. String -> BenchBaseOpts a b -> Bench Unit Unit`
+<!-- PD_END -->
 
 <!-- PD_START:purs
 filePath: test/Test/Doc.purs
@@ -171,18 +141,45 @@ bench3 = BL.bench_
 
 <!-- PD_END -->
 
+## Options
+
 <!-- PD_START:purs
 filePath: src/BenchLib.purs
 pick:
   - tag: signature
-    name: group_
+    name: bench
 -->
 
 ```purescript
-group_ :: forall a b. String -> Array (Bench a b) -> Group
+bench
+  :: forall a' b' a b
+   . String
+  -> (BenchOpts Unit Unit a b -> BenchOpts a' b' a b)
+  -> BenchBaseOpts a b
+  -> Bench a' b'
 ```
 
 <!-- PD_END -->
+
+<!-- PD_START:purs
+filePath: src/BenchLib.purs
+pick:
+  - BenchOpts
+-->
+
+```purescript
+type BenchOpts a' b' a b =
+  { iterations :: Int
+  , normIn :: a -> a'
+  , normOut :: b -> b'
+  }
+```
+
+<!-- PD_END -->
+
+# Groups
+
+## Basic
 
 <!-- PD_START:purs
 filePath: test/Test/Doc.purs
@@ -202,34 +199,17 @@ group1 = BL.group_
 
 <!-- PD_END -->
 
-<!-- PD_START:purs
-filePath: src/BenchLib.purs
-pick:
-  - BenchOpts
--->
-
-```purescript
-type BenchOpts a' b' a b =
-  { iterations :: Int
-  , normIn :: a -> a'
-  , normOut :: b -> b'
-  }
-```
-
-<!-- PD_END -->
+## Options
 
 <!-- PD_START:purs
 filePath: src/BenchLib.purs
 pick:
-  - BenchOpts
+  - tag: signature
+    name: group_
 -->
 
 ```purescript
-type BenchOpts a' b' a b =
-  { iterations :: Int
-  , normIn :: a -> a'
-  , normOut :: b -> b'
-  }
+group_ :: forall a b. String -> Array (Bench a b) -> Group
 ```
 
 <!-- PD_END -->
@@ -251,3 +231,25 @@ type GroupOpts a b =
 ```
 
 <!-- PD_END -->
+
+## Normalization
+
+# Suites
+
+## Runners
+
+## Reporters
+
+### Console
+
+### HTML
+
+### JSON
+
+# Effectful Benchmarks
+
+# Appendix
+
+## Module Imports
+
+## Convenience Functions

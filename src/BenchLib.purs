@@ -423,7 +423,12 @@ group groupName mkGroupOpts benches_ =
         pure groupResult
     }
 
-bench :: forall a' b' a b. String -> (BenchOpts Unit Unit a b -> BenchOpts a' b' a b) -> BenchBaseOpts a b -> Bench a' b'
+bench
+  :: forall a' b' a b
+   . String
+  -> (BenchOpts Unit Unit a b -> BenchOpts a' b' a b)
+  -> BenchBaseOpts a b
+  -> Bench a' b'
 bench benchName mkOpts { prepare, run } =
   Bench
     { benchName

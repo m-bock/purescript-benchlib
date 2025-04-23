@@ -10,7 +10,7 @@ import Data.List.Lazy (List)
 import Data.List.Lazy as List
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as String
-import Data.Tuple.Nested ((/\))
+import Data.Tuple.Nested (type (/\), (/\))
 
 prepareCharArray :: Size -> Array Char
 prepareCharArray size = Array.replicate size 'x'
@@ -56,22 +56,57 @@ suite1 = BL.suite_
   [ group1
   ]
 
--- benchNormalized1 :: Bench (Array Char) Int
--- benchNormalized1 = bench1
+benchNormalized1 :: Bench (Array Char) Int
+benchNormalized1 = BL.bench
+  "Length of Array of Char"
+  ( \opts -> opts
+      { normIn = identity
+      , normOut = identity
+      }
+  )
+  { prepare: \size -> Array.replicate size 'x'
+  , run: Array.length
+  }
 
--- benchNormalized2 :: Bench (Array Char) Int
--- benchNormalized2 = BL.normalizeInput List.toUnfoldable bench2
+benchNormalized2 :: Bench (Array Char) Int
+benchNormalized2 = BL.bench
+  "Length of List of Char"
+  ( \opts -> opts
+      { normIn = List.toUnfoldable
+      , normOut = identity
+      }
+  )
+  { prepare: \size -> List.replicate size 'x'
+  , run: List.length
+  }
 
--- benchNormalized3 :: Bench (Array Char) Int
--- benchNormalized3 = BL.normalizeInput String.toCharArray bench3
+benchNormalized3 :: Bench (Array Char) Int
+benchNormalized3 = BL.bench
+  "Length of String"
+  ( \opts -> opts
+      { normIn = String.toCharArray
+      , normOut = identity
+      }
+  )
+  { prepare: \size -> String.fromCharArray (Array.replicate size 'x')
+  , run: String.length
+  }
 
--- groupNormalized :: Group
--- groupNormalized = BL.group_
---   "Length of Char"
---   [ benchNormalized1
---   , benchNormalized2
---   , benchNormalized3
---   ]
+checkFn :: Int -> Array (Array Char /\ Int) -> Boolean
+checkFn size = all \(input /\ output) ->
+  (input == Array.replicate size 'x') && (output == Array.length input)
+
+groupNormalized :: Group
+groupNormalized = BL.group
+  "Length of Char"
+  ( \cfg -> cfg
+      { check = Just checkFn
+      }
+  )
+  [ benchNormalized1
+  , benchNormalized2
+  , benchNormalized3
+  ]
 
 -- suite1 ∷ Suite
 -- suite1 = BL.suite_ "My Benchmarks"
