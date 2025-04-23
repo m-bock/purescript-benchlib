@@ -157,27 +157,36 @@
             "effect",
             "lists",
             "node-process",
+            "patchdown",
             "spec"
           ],
           "build_plan": [
             "aff",
             "ansi",
+            "argonaut",
+            "argonaut-codecs",
+            "argonaut-core",
+            "argonaut-traversals",
             "arraybuffer-types",
             "arrays",
             "avar",
             "bifunctors",
             "catenable-lists",
+            "codec",
+            "codec-argonaut",
             "console",
             "const",
             "contravariant",
             "control",
             "datetime",
+            "debug",
             "distributive",
             "effect",
             "either",
             "enums",
             "exceptions",
             "exists",
+            "filterable",
             "foldable-traversable",
             "foreign",
             "foreign-object",
@@ -189,6 +198,8 @@
             "identity",
             "integers",
             "invariant",
+            "js-date",
+            "language-cst-parser",
             "lazy",
             "lists",
             "maybe",
@@ -196,6 +207,8 @@
             "newtype",
             "node-buffer",
             "node-event-emitter",
+            "node-fs",
+            "node-path",
             "node-process",
             "node-streams",
             "nonempty",
@@ -206,22 +219,28 @@
             "orders",
             "parallel",
             "partial",
+            "patchdown",
             "pipes",
             "posix-types",
             "prelude",
             "profunctor",
+            "profunctor-lenses",
+            "record",
             "refs",
             "safe-coerce",
             "spec",
             "st",
             "strings",
+            "strings-extra",
             "tailrec",
             "transformers",
             "tuples",
             "type-equality",
             "typelevel-prelude",
             "unfoldable",
-            "unsafe-coerce"
+            "unicode",
+            "unsafe-coerce",
+            "variant"
           ]
         }
       }
@@ -762,7 +781,7 @@
     "extra_packages": {
       "codec-argonaut": {
         "git": "https://github.com/garyb/purescript-codec-argonaut.git",
-        "ref": "78b0171958a4f21ed23946fe7e574ea5018902d9",
+        "ref": "dc287c83b79f86f8d9a0045dcb740f0cf9d23ccd",
         "dependencies": [
           "argonaut-core",
           "codec",
@@ -771,6 +790,10 @@
           "type-equality",
           "variant"
         ]
+      },
+      "patchdown": {
+        "git": "https://github.com/m-bock/purescript-patchdown.git",
+        "ref": "8147f60ff9c43b5c7b9af83e03efb000e4dcbf0e"
       }
     }
   },
@@ -942,7 +965,7 @@
     "codec-argonaut": {
       "type": "git",
       "url": "https://github.com/garyb/purescript-codec-argonaut.git",
-      "rev": "78b0171958a4f21ed23946fe7e574ea5018902d9",
+      "rev": "dc287c83b79f86f8d9a0045dcb740f0cf9d23ccd",
       "dependencies": [
         "argonaut-core",
         "codec",
@@ -1013,6 +1036,15 @@
         "partial",
         "prelude",
         "tuples"
+      ]
+    },
+    "debug": {
+      "type": "registry",
+      "version": "6.0.2",
+      "integrity": "sha256-vmkYFuXYuELBzeauvgHG6E6Kf/Hp1dAnxwE9ByHfwSg=",
+      "dependencies": [
+        "functions",
+        "prelude"
       ]
     },
     "distributive": {
@@ -1265,6 +1297,40 @@
         "now"
       ]
     },
+    "language-cst-parser": {
+      "type": "registry",
+      "version": "0.14.1",
+      "integrity": "sha256-LJzh1ZTaKjcrHx95ZfO2La3w6Xb/IZQT3m2Nuj4n1dM=",
+      "dependencies": [
+        "arrays",
+        "const",
+        "control",
+        "effect",
+        "either",
+        "enums",
+        "foldable-traversable",
+        "free",
+        "functions",
+        "functors",
+        "identity",
+        "integers",
+        "lazy",
+        "lists",
+        "maybe",
+        "newtype",
+        "numbers",
+        "ordered-collections",
+        "partial",
+        "prelude",
+        "st",
+        "strings",
+        "transformers",
+        "tuples",
+        "typelevel-prelude",
+        "unfoldable",
+        "unsafe-coerce"
+      ]
+    },
     "lazy": {
       "type": "registry",
       "version": "6.0.0",
@@ -1513,6 +1579,26 @@
       "integrity": "sha256-fwXerld6Xw1VkReh8yeQsdtLVrjfGiVuC5bA1Wyo/J4=",
       "dependencies": []
     },
+    "patchdown": {
+      "type": "git",
+      "url": "https://github.com/m-bock/purescript-patchdown.git",
+      "rev": "8147f60ff9c43b5c7b9af83e03efb000e4dcbf0e",
+      "dependencies": [
+        "argonaut",
+        "argonaut-core",
+        "codec-argonaut",
+        "console",
+        "debug",
+        "effect",
+        "exists",
+        "filterable",
+        "language-cst-parser",
+        "node-fs",
+        "node-process",
+        "prelude",
+        "strings-extra"
+      ]
+    },
     "pipes": {
       "type": "registry",
       "version": "8.0.0",
@@ -1679,6 +1765,19 @@
         "unsafe-coerce"
       ]
     },
+    "strings-extra": {
+      "type": "registry",
+      "version": "4.0.0",
+      "integrity": "sha256-tah7VFvEvFF4tpWXgWwGFIynpWHkYe5tpy6bWi5tMpU=",
+      "dependencies": [
+        "arrays",
+        "foldable-traversable",
+        "maybe",
+        "prelude",
+        "strings",
+        "unicode"
+      ]
+    },
     "tailrec": {
       "type": "registry",
       "version": "6.1.0",
@@ -1751,6 +1850,16 @@
         "partial",
         "prelude",
         "tuples"
+      ]
+    },
+    "unicode": {
+      "type": "registry",
+      "version": "6.0.0",
+      "integrity": "sha256-QJnTVZpmihEAUiMeYrfkusVoziJWp2hJsgi9bMQLue8=",
+      "dependencies": [
+        "foldable-traversable",
+        "maybe",
+        "strings"
       ]
     },
     "unsafe-coerce": {

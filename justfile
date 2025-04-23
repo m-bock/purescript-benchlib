@@ -1,2 +1,2 @@
 gen-docs:
-    node scripts/gen-docs.js && npx doctoc docs/tutorial.md
+    PATCHDOWN_FILE_PATH="./docs/tutorial.md" npx spago run -m Patchdown
