@@ -1,4 +1,68 @@
-# Prepare Functions
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Benchmarks](#benchmarks)
+  - [Type Signatures](#type-signatures)
+  - [Preparation Functions](#preparation-functions)
+  - [Benchmark Definitions](#benchmark-definitions)
+  - [Options](#options)
+- [Groups](#groups)
+  - [Basic](#basic)
+  - [Normalized](#normalized)
+  - [Options](#options-1)
+- [Suites](#suites)
+- [Runners](#runners)
+  - [Node](#node)
+- [Reporters](#reporters)
+  - [Console](#console)
+  - [HTML](#html)
+  - [JSON](#json)
+- [Effectful Benchmarks](#effectful-benchmarks)
+- [Appendix](#appendix)
+  - [Module Imports](#module-imports)
+  - [Convenience Functions](#convenience-functions)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+# Benchmarks
+
+## Type Signatures
+
+## Preparation Functions
+
+## Benchmark Definitions
+
+## Options
+
+# Groups
+
+## Basic
+
+## Normalized
+
+## Options
+
+# Suites
+
+## Runners
+
+## Reporters
+
+### Console
+
+### HTML
+
+### JSON
+
+# Effectful Benchmarks
+
+# Appendix
+
+## Module Imports
+
+## Convenience Functions
+
+---
 
 <!-- PD_START:purs
 filePath: test/Test/Doc.purs
