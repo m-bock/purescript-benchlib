@@ -16,6 +16,8 @@
     - [Console](#console)
     - [HTML](#html)
     - [JSON](#json)
+- [Full Examples](#full-examples)
+  - [Basic](#basic-1)
 - [Effectful Benchmarks](#effectful-benchmarks)
 - [Appendix](#appendix)
   - [Module Imports](#module-imports)
@@ -245,6 +247,44 @@ type GroupOpts a b =
 ### HTML
 
 ### JSON
+
+# Full Examples
+
+## Basic
+
+<!-- PD_START:purs
+filePath: test/Test/Doc.purs
+pick:
+  - fullExample1
+-->
+
+```purescript
+fullExample1 :: Effect Unit
+fullExample1 = BL.runNode_ $
+  BL.suite_
+    "Sample"
+    [ BL.group_
+        "Length operations"
+        [ BL.bench_
+            "Length of Array of Char"
+            { prepare: \size -> Array.replicate size 'x'
+            , run: Array.length
+            }
+        , BL.bench_
+            "Length of List of Char"
+            { prepare: \size -> List.replicate size 'x'
+            , run: List.length
+            }
+        , BL.bench_
+            "Length of String"
+            { prepare: \size -> String.fromCharArray (Array.replicate size 'x')
+            , run: String.length
+            }
+        ]
+    ]
+```
+
+<!-- PD_END -->
 
 # Effectful Benchmarks
 

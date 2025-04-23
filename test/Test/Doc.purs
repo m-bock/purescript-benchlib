@@ -11,6 +11,7 @@ import Data.List.Lazy as List
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as String
 import Data.Tuple.Nested (type (/\), (/\))
+import Effect (Effect)
 
 prepareCharArray :: Size -> Array Char
 prepareCharArray size = Array.replicate size 'x'
@@ -55,6 +56,30 @@ suite1 = BL.suite_
   "My Benchmarks"
   [ group1
   ]
+
+fullExample1 :: Effect Unit
+fullExample1 = BL.runNode_ $
+  BL.suite_
+    "Sample"
+    [ BL.group_
+        "Length operations"
+        [ BL.bench_
+            "Length of Array of Char"
+            { prepare: \size -> Array.replicate size 'x'
+            , run: Array.length
+            }
+        , BL.bench_
+            "Length of List of Char"
+            { prepare: \size -> List.replicate size 'x'
+            , run: List.length
+            }
+        , BL.bench_
+            "Length of String"
+            { prepare: \size -> String.fromCharArray (Array.replicate size 'x')
+            , run: String.length
+            }
+        ]
+    ]
 
 benchNormalized1 :: Bench (Array Char) Int
 benchNormalized1 = BL.bench
@@ -107,40 +132,3 @@ groupNormalized = BL.group
   , benchNormalized2
   , benchNormalized3
   ]
-
--- suite1 ∷ Suite
--- suite1 = BL.suite_ "My Benchmarks"
---   [ groupNormalized
---   ]
-
--- suite2 ∷ Suite
--- suite2 =
---   BL.suite_
---     "My Benchmarks"
---     [ BL.group
---         "Length operations"
---         ( \opts -> opts
---             { sizes = [ 1, 10, 100, 1000 ]
---             , iterations = 1000
-
---             , check = Just \size -> all \(input /\ output) ->
---                 (input == Array.replicate size 'x') && (output == Array.length input)
-
---             }
---         )
---         [ BL.bench_
---             "Length of Array of Char"
---             (\size -> Array.replicate size 'x')
---             Array.length
-
---         , BL.normalizeInput List.toUnfoldable $ BL.bench_
---             "Length of List of Char"
---             (\size -> List.replicate size 'x')
---             List.length
-
---         , BL.normalizeInput String.toCharArray $ BL.bench_
---             "Length of String"
---             (\size -> String.fromCharArray (Array.replicate size 'x'))
---             String.length
---         ]
---     ]
