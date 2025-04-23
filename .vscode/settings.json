@@ -1,0 +1,12 @@
+{
+    "emeraldwalk.runonsave": {
+      "commands": [
+        {
+          // Run whenever html, css, or js files are saved
+          "match": "\\.(md)$",
+          "cmd": "just gen-docs",
+          "message": "just gen-docs",
+        }
+      ]
+    }
+  }

@@ -26,9 +26,75 @@
 
 # Benchmarks
 
+In this tutorial, we'll use **benchlib** to compare the runtime performance of computing the length of three different PureScript collections: `Array`, `List`, and `String`.
+
 ## Type Signatures
 
+Here are the type signatures of the functions we'll benchmark:
+
+<!-- PD_START:purs
+inline: true
+pick:
+  - tag: signature_or_foreign
+    name: length
+    filePath: .spago/p/arrays-7.3.0/src/Data/Array.purs
+    prefix: '- '
+  - tag: signature_or_foreign
+    name: length
+    filePath: .spago/p/lists-7.0.0/src/Data/List.purs
+    prefix: '- '
+  - tag: signature_or_foreign
+    name: length
+    filePath: .spago/p/strings-6.0.1/src/Data/String/CodePoints.purs
+    prefix: '- '
+split: true
+-->- `length :: forall a. Array a -> Int`
+
+- `length :: forall a. List a -> Int`
+- `length :: String -> Int`<!-- PD_END -->
+
+Each function computes the number of elements in its respective collection type.
+
 ## Preparation Functions
+
+Before we define our actual benchmarks, we need to create functions that prepare input data of a given size.
+
+<!-- PD_START:purs
+filePath: src/BenchLib.purs
+pick:
+  - Size
+-->
+
+```purescript
+type Size = Int
+```
+
+<!-- PD_END -->
+
+<!-- PD_START:purs
+filePath: test/Test/Doc.purs
+pick:
+  - prepareCharArray
+  - prepareCharList
+  - prepareString
+-->
+
+```purescript
+prepareCharArray :: Size -> Array Char
+prepareCharArray size = Array.replicate size 'x'
+
+prepareCharList :: Size -> List Char
+prepareCharList size = List.replicate size 'x'
+
+prepareString :: Size -> String
+prepareString size = String.fromCharArray (Array.replicate size 'x')
+```
+
+<!-- PD_END -->
+
+Each function takes a `Size` (an alias for `Int`) and returns a uniformly filled collection of that size using the character `'x'`.
+
+We will benchmark these functions at varying sizes to analyze the performance trends.
 
 ## Benchmark Definitions
 
@@ -65,25 +131,6 @@
 ---
 
 <!-- PD_START:purs
-filePath: test/Test/Doc.purs
-pick:
-  - prepareCharArray
-  - prepareCharList
-  - prepareString
--->
-```purescript
-prepareCharArray :: Size -> Array Char
-prepareCharArray size = Array.replicate size 'x'
-
-prepareCharList :: Size -> List Char
-prepareCharList size = List.replicate size 'x'
-
-prepareString :: Size -> String
-prepareString size = String.fromCharArray (Array.replicate size 'x')
-```
-<!-- PD_END -->
-
-<!-- PD_START:purs
 filePath: src/BenchLib.purs
 inline: true
 pick:
@@ -98,6 +145,7 @@ pick:
   - bench2
   - bench3
 -->
+
 ```purescript
 bench1 :: Bench Unit Unit
 bench1 = BL.bench_
@@ -120,6 +168,7 @@ bench3 = BL.bench_
   , run: String.length
   }
 ```
+
 <!-- PD_END -->
 
 <!-- PD_START:purs
@@ -128,10 +177,11 @@ pick:
   - tag: signature
     name: group_
 -->
+
 ```purescript
--- | Like `group`, but with default options.
 group_ :: forall a b. String -> Array (Bench a b) -> Group
 ```
+
 <!-- PD_END -->
 
 <!-- PD_START:purs
@@ -139,6 +189,7 @@ filePath: test/Test/Doc.purs
 pick:
   - group1
 -->
+
 ```purescript
 group1 :: Group
 group1 = BL.group_
@@ -148,6 +199,7 @@ group1 = BL.group_
   , bench3
   ]
 ```
+
 <!-- PD_END -->
 
 <!-- PD_START:purs
@@ -155,14 +207,15 @@ filePath: src/BenchLib.purs
 pick:
   - BenchOpts
 -->
+
 ```purescript
--- | Options for pure benchmarks.
 type BenchOpts a' b' a b =
   { iterations :: Int
   , normIn :: a -> a'
   , normOut :: b -> b'
   }
 ```
+
 <!-- PD_END -->
 
 <!-- PD_START:purs
@@ -170,14 +223,15 @@ filePath: src/BenchLib.purs
 pick:
   - BenchOpts
 -->
+
 ```purescript
--- | Options for pure benchmarks.
 type BenchOpts a' b' a b =
   { iterations :: Int
   , normIn :: a -> a'
   , normOut :: b -> b'
   }
 ```
+
 <!-- PD_END -->
 
 <!-- PD_START:purs
@@ -185,8 +239,8 @@ filePath: src/BenchLib.purs
 pick:
   - GroupOpts
 -->
+
 ```purescript
--- | Options for the benchmark group.
 type GroupOpts a b =
   { sizes :: Array Int
   , iterations :: Int
@@ -195,4 +249,5 @@ type GroupOpts a b =
   , printOutput :: Maybe (b -> String)
   }
 ```
+
 <!-- PD_END -->
