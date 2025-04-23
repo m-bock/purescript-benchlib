@@ -21,46 +21,40 @@ prepareCharList size = List.replicate size 'x'
 prepareString :: Size -> String
 prepareString size = String.fromCharArray (Array.replicate size 'x')
 
--- bench1 :: Bench (Array Char) Int
--- bench1 = BL.bench_ "Length of Array of Char"
---   prepareCharArray
---   Array.length
+bench1 :: Bench Unit Unit
+bench1 = BL.bench_
+  "Length of Array of Char"
+  { prepare: prepareCharArray
+  , run: Array.length
+  }
 
--- bench2 :: Bench (List Char) Int
--- bench2 = BL.bench_ "Length of List of Char"
---   prepareCharList
---   List.length
+bench2 :: Bench Unit Unit
+bench2 = BL.bench_
+  "Length of List of Char"
+  { prepare: prepareCharList
+  , run: List.length
+  }
 
--- bench3 :: Bench String Int
--- bench3 = BL.bench_ "Length of String"
---   prepareString
---   String.length
+bench3 :: Bench Unit Unit
+bench3 = BL.bench_
+  "Length of String"
+  { prepare: prepareString
+  , run: String.length
+  }
 
--- benchBasic1 :: Bench Unit Unit
--- benchBasic1 = BL.basic bench1
+group1 :: Group
+group1 = BL.group_
+  "Length operations"
+  [ bench1
+  , bench2
+  , bench3
+  ]
 
--- benchBasic2 :: Bench Unit Unit
--- benchBasic2 = BL.basic bench2
-
--- benchBasic3 :: Bench Unit Unit
--- benchBasic3 = BL.basic bench3
-
--- groupBasic :: Group
--- groupBasic = BL.group_
---   "Length operations"
---   [ benchBasic1
---   , benchBasic2
---   , benchBasic3
---   ]
-
--- groupBasic' :: Group
--- groupBasic' = BL.group
---   "Length operations"
---   (\opts -> opts)
---   [ benchBasic1
---   , benchBasic2
---   , benchBasic3
---   ]
+suite1 :: Suite
+suite1 = BL.suite_
+  "My Benchmarks"
+  [ group1
+  ]
 
 -- benchNormalized1 :: Bench (Array Char) Int
 -- benchNormalized1 = bench1
