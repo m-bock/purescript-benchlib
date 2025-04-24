@@ -477,7 +477,7 @@ benchAff benchName mkOpts { prepare, run } =
           inputs :: NonEmptyArray a <- replicate1A iterations (prepare size)
 
           duration <- measureTime \_ -> do
-            _results :: NonEmptyArray b <- for inputs run
+            _results :: NonEmptyArray b <- for inputs \input -> run input
             pure unit
 
           let average = Milliseconds (unwrap duration / Int.toNumber iterations)
