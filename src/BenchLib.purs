@@ -40,9 +40,7 @@ import Data.Array (filter, foldr)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.DateTime.Instant (unInstant)
-import Data.Either (Either(..), isLeft)
-import Data.Filterable (filterMap)
-import Data.Foldable (all, findMap, for_)
+import Data.Foldable (for_)
 import Data.FoldableWithIndex (findMapWithIndex)
 import Data.Generic.Rep (class Generic)
 import Data.Int as Int
@@ -65,7 +63,6 @@ import Effect.Now (now)
 import Effect.Ref as Ref
 import Node.Process as Process
 import Prim.TypeError (class Warn, Text)
-import Unsafe.Coerce (unsafeCoerce)
 
 --- Type Aliases
 
