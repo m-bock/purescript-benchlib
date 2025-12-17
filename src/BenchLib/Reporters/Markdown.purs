@@ -15,6 +15,7 @@ import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (unwrap)
 import Data.Number.Format as Number
 import Data.Semigroup.Foldable (foldr1)
 import Data.String as Str
@@ -30,12 +31,16 @@ import Node.Path (FilePath)
 type Opts =
   { filePath :: FilePath
   , showHeadline :: Boolean
+  , minTime :: Milliseconds
+  , maxTime :: Milliseconds
   }
 
 defaultOpts :: Opts
 defaultOpts =
   { filePath: "bench-results.md"
   , showHeadline: false
+  , minTime: Milliseconds 0.0
+  , maxTime: Milliseconds 0.0
   }
 
 reportMarkdown_ :: Reporter
@@ -55,14 +60,14 @@ reportMarkdown mkOpts =
 toSuiteMd :: Opts -> SuiteResult -> String
 toSuiteMd opts { groupResults, suiteName } = Str.joinWith "\n"
   [ if opts.showHeadline then "# " <> suiteName else ""
-  , Str.joinWith "\n" $ map groupToMd groupResults
+  , Str.joinWith "\n" $ map (groupToMd opts) groupResults
   ]
 
 colors :: Array String
 colors = [ "ff3456", "00ff00", "0000ff", "ffff00", "ff00ff", "00ffff" ]
 
-groupToMd :: GroupResult -> String
-groupToMd { benchResults, groupName } = Str.joinWith "\n"
+groupToMd :: Opts -> GroupResult -> String
+groupToMd opts { benchResults, groupName } = Str.joinWith "\n"
   [ "```mermaid"
   , "---"
   , "  config:"
@@ -70,11 +75,10 @@ groupToMd { benchResults, groupName } = Str.joinWith "\n"
   , "        xyChart:"
   , "            plotColorPalette: \"" <> Str.joinWith ", " (map ("#" <> _) colors) <> "\""
   , "---"
-  , "xychart-beta"
+  , "xychart"
   , "  title \"" <> groupName <> "\""
   , "  x-axis \"Input Size\" [" <> getXTicks' sizes <> "]"
-  , "  y-axis \"Time (in ms)\" 0 --> 1"
-  -- , "  line [100, 200, 300]"
+  , "  y-axis \"Time (in ms)\" " <> Number.toString (unwrap opts.minTime) <> " --> " <> Number.toString (unwrap opts.maxTime)
   , Str.joinWith "\n" $ map (("  " <> _) <<< getLine' sizes) benchResults
   , "```"
   , Str.joinWith "&nbsp;&nbsp;" $ mapWithIndex getLegendItem benchNames
@@ -90,12 +94,6 @@ getLegendItem i name =
     color = fromMaybe "white" (colors !! (i `mod` Array.length colors))
   in
     "![" <> color <> "](https://placehold.co/8x8/" <> color <> "/" <> color <> ".png) " <> name <> ""
-
--- "<span style=\"background-color: " <> color <> ";\">" <> name <> "</span>"  
-
--- - ![#f03c15](https://placehold.co/15x15/f03c15/f03c15.png) `#f03c15`
--- - ![#c5f015](https://placehold.co/15x15/c5f015/c5f015.png) `#c5f015`
--- - ![#1589F0](https://placehold.co/15x15/1589F0/1589F0.png) `#1589F0`
 
 getLine' :: Array Size -> BenchResult -> String
 getLine' sizes bench = "line [" <> (Str.joinWith ", " $ map Number.toString durs) <> "]"

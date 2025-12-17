@@ -314,7 +314,7 @@ type PerSizeItf a b =
   }
 
 mkPerSizeItf :: forall a b. GroupName -> GroupOpts a b -> Aff (PerSizeItf a b)
-mkPerSizeItf groupName groupOpts@{ printInput, printOutput } = liftEffect do
+mkPerSizeItf groupName groupOpts = liftEffect do
   refAccum <- Ref.new (Map.empty :: Map Size (ResultPerSize a b))
 
   pure
@@ -340,9 +340,9 @@ mkPerSizeItf groupName groupOpts@{ printInput, printOutput } = liftEffect do
           # findMapWithIndex
               ( \size r ->
                   let
-                    isSuccess = check size (map (\{ input, output } -> input /\ output) r)
+                    isSuccess' = check size (map (\{ input, output } -> input /\ output) r)
                   in
-                    if isSuccess then Nothing
+                    if isSuccess' then Nothing
                     else Just
                       { firstFailure: mkSizeCheckResult size r
                       }
@@ -707,10 +707,6 @@ type SuiteSummary =
   , countCheckedGroups :: Int
   , countFailedGroups :: Int
   }
-
--- type GroupSummary =
---   { checked :: Maybe (Maybe CheckResults)
---   }
 
 printStats :: String -> Array (String /\ String /\ Maybe String) -> String
 printStats sep stats = Str.joinWith sep (map (\(k /\ v /\ un) -> k <> "=" <> asciColorStr bold v <> fromMaybe "" un) stats)
