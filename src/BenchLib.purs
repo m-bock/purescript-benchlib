@@ -36,6 +36,7 @@ module BenchLib
 
 import Prelude
 
+import Control.Monad.Error.Class (throwError)
 import Data.Array (filter, foldr)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
@@ -47,7 +48,7 @@ import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (unwrap)
+import Data.Newtype (un, unwrap)
 import Data.Number.Format as NumFmt
 import Data.String as Str
 import Data.Time.Duration (Milliseconds(..))
@@ -59,6 +60,7 @@ import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console as Console
+import Effect.Exception (error)
 import Effect.Now (now)
 import Effect.Ref as Ref
 import Node.Process as Process
@@ -95,6 +97,7 @@ type BenchOpts a' b' a b =
   { iterations :: Int
   , normIn :: a -> a'
   , normOut :: b -> b'
+  , eq :: b -> b -> Boolean
   }
 
 -- | Options for effectful benchmarks.
@@ -102,6 +105,7 @@ type BenchOptsAff a' b' a b =
   { iterations :: Int
   , normIn :: a -> Aff a'
   , normOut :: b -> Aff b'
+  , eq :: b -> b -> Boolean
   }
 
 --- Result Types
@@ -139,6 +143,7 @@ type SampleResult =
   { iterations :: Int
   , size :: Size
   , average :: Milliseconds
+  , duration :: Milliseconds
   }
 
 type SizeCheckResult =
@@ -259,6 +264,7 @@ mkDefaultBenchOpts { iterations } =
   { iterations
   , normIn: const unit
   , normOut: const unit
+  , eq: \_ _ -> true
   }
 
 mkDefaultBenchOptsAff :: forall a b. { iterations :: Size } -> BenchOptsAff Unit Unit a b
@@ -266,6 +272,7 @@ mkDefaultBenchOptsAff { iterations } =
   { iterations
   , normIn: const (pure unit)
   , normOut: const (pure unit)
+  , eq: \_ _ -> true
   }
 
 --- Core functions
@@ -431,22 +438,9 @@ bench benchName mkOpts { prepare, run } =
     { benchName
     , only: false
     , runBench: \{ size, iterations } -> do
-        let { iterations, normIn, normOut } = mkOpts $ mkDefaultBenchOpts { iterations }
+        let { iterations, normIn, normOut, eq } = mkOpts $ mkDefaultBenchOpts { iterations }
 
-        sampleResult <- do
-          let
-            input = prepare size
-
-          duration <- measureTime \_ -> do
-            for_ (range 0 iterations :: Array _) \_ -> do
-              let _output = run input
-              pure unit
-
-          let average = Milliseconds (unwrap duration / Int.toNumber iterations)
-
-          pure { size, average, iterations }
-
-        { inputNorm, outputNorm } <- do
+        { inputNorm, output, outputNorm } <- do
           let
             input = prepare size :: a
             inputNorm = normIn input :: a'
@@ -454,7 +448,34 @@ bench benchName mkOpts { prepare, run } =
             output = run input :: b
             outputNorm = normOut output :: b'
 
-          pure { inputNorm, outputNorm }
+          pure { inputNorm, output, outputNorm }
+
+        sampleResult <- do
+          let
+            input = prepare size
+
+          durationOverhead <- measureTime \_ -> do
+            for_ (range 1 iterations :: Array _) \_ -> do
+              unless (eq output output) do
+                throwError (error "Output does not match")
+              pure unit
+
+          durationReal <- measureTime \_ -> do
+            for_ (range 1 iterations :: Array _) \_ -> do
+              let output' = run input
+              unless (eq output' output) do
+                throwError (error "Output does not match")
+              pure unit
+
+          let
+            duration = Milliseconds
+              ( max 0.0
+                  (un Milliseconds durationReal - un Milliseconds durationOverhead)
+              )
+
+          let average = Milliseconds (unwrap duration / Int.toNumber iterations)
+
+          pure { size, average, iterations, duration }
 
         pure
           { sampleResult
@@ -470,28 +491,38 @@ benchAff benchName mkOpts { prepare, run } =
     { benchName
     , only: false
     , runBench: \{ size, iterations } -> do
-        let { iterations, normIn, normOut } = mkOpts $ mkDefaultBenchOptsAff { iterations }
+        let { iterations, normIn, normOut, eq } = mkOpts $ mkDefaultBenchOptsAff { iterations }
 
-        sampleResult <- do
+        inputs :: NonEmptyArray a <- replicate1A iterations (prepare size)
 
-          inputs :: NonEmptyArray a <- replicate1A iterations (prepare size)
-
-          duration <- measureTime \_ -> do
-            _results :: NonEmptyArray b <- for inputs \input -> run input
-            pure unit
-
-          let average = Milliseconds (unwrap duration / Int.toNumber iterations)
-
-          pure { size, average, iterations }
-
-        { outputNorm, inputNorm } <- do
+        { outputNorm, inputNorm, output } <- do
           input <- prepare size
           inputNorm <- normIn input
 
           output <- run input
           outputNorm <- normOut output
 
-          pure { outputNorm, inputNorm }
+          pure { outputNorm, inputNorm, output }
+
+        sampleResult <- do
+
+          durationOverhead <- measureTime \_ -> do
+            for_ inputs \input -> do
+              unless (eq output output) do
+                throwError (error "Output does not match")
+              pure unit
+
+          durationReal <- measureTime \_ -> do
+            for_ inputs \input -> do
+              output' <- run input
+              unless (eq output' output) do
+                throwError (error "Output does not match")
+
+          let duration = Milliseconds (unwrap durationReal - unwrap durationOverhead)
+
+          let average = Milliseconds (unwrap duration / Int.toNumber iterations)
+
+          pure { size, average, iterations, duration }
 
         pure
           { sampleResult
@@ -635,11 +666,12 @@ reportConsole = defaultReporter
 
       Console.log ("")
 
-  , onSampleFinish = \{ size, average, iterations } -> Console.log
+  , onSampleFinish = \{ size, average, iterations, duration } -> Console.log
       ( asciColorStr bold "      » " <> printStats " "
           [ "size" /\ Int.toStringAs Int.decimal size /\ Nothing
           , "count" /\ Int.toStringAs Int.decimal iterations /\ Nothing
           , "avg" /\ printMs average /\ Just "ms"
+          , "dur" /\ printMs duration /\ Just "ms"
           ]
       )
 

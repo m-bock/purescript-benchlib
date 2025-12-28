@@ -100,6 +100,7 @@ codecSampleResult = CAR.object "SampleResult"
   { size: CA.int
   , average: codecMilliseconds
   , iterations: CA.int
+  , duration: codecMilliseconds
   }
 
 codecMilliseconds :: JsonCodec Milliseconds
