@@ -88,7 +88,7 @@ type FieldEncoding =
   , type :: String
   , title :: String
   , scale :: Maybe { domain :: Array Number }
-  , axis :: Maybe { tickCount :: Int, values :: Array Number }
+  , axis :: Maybe { tickCount :: Int, values :: Maybe (Array Number) }
   }
 
 type ColorEncoding =
@@ -136,14 +136,15 @@ toVegaLiteSpec opts { benchResults } =
     
     -- Use actual size values from data for ticks
     uniqueSizes = Array.sort $ Array.nub sizes
-    xAxis = Just { tickCount: Array.length uniqueSizes, values: map Int.toNumber uniqueSizes }
+    xAxis = Just { tickCount: Array.length uniqueSizes, values: Just $ map Int.toNumber uniqueSizes }
+    yAxis = Just { tickCount: 10, values: Nothing }
   in
     { "$schema": "https://vega.github.io/schema/vega-lite/v6.json"
     , data: { values: dataValues }
     , mark: { type: "line", point: true }
     , encoding:
         { x: { field: "size", type: "quantitative", title: "Size", scale: xScale, axis: xAxis }
-        , y: { field: "ms", type: "quantitative", title: "Time (ms)", scale: yScale, axis: Nothing }
+        , y: { field: "ms", type: "quantitative", title: "Time (ms)", scale: yScale, axis: yAxis }
         , color:
             { field: "series"
             , type: "nominal"
@@ -189,7 +190,7 @@ codecFieldEncoding = CAR.object "FieldEncoding"
       }
   , axis: CAP.maybe $ CAR.object "Axis"
       { tickCount: CA.int
-      , values: CA.array CA.number
+      , values: CAP.maybe $ CA.array CA.number
       }
   }
 
