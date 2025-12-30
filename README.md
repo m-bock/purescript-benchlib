@@ -1,6 +1,6 @@
 # purescript-benchlib
 
-<img src="docs/logo.png" width="400"/>
+<img src="docs/logo.png" width="100%" height="250"/>
 
 A simple and flexible benchmarking library for PureScript.
 
