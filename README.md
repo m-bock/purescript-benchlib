@@ -1,8 +1,8 @@
-# purescript-benchlib
-
 <img src="docs/logo.png" />
 
 A simple and flexible benchmarking library for PureScript.
+
+# purescript-benchlib
 
 ## Features
 

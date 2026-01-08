@@ -11,11 +11,7 @@ import Data.Argonaut (stringifyWithIndent)
 import Data.Array as Array
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
-import Data.Codec.Argonaut.Compat as CAP
 import Data.Codec.Argonaut.Record as CAR
-import Data.Foldable (maximum, minimum)
-import Data.Int as Int
-import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as Str
 import Data.Time.Duration (Milliseconds(..))
 import Effect.Class (liftEffect)
@@ -28,20 +24,12 @@ import Node.Path (FilePath)
 type Opts =
   { folderPath :: FilePath
   , indent :: Int
-  , minTime :: Maybe Number
-  , maxTime :: Maybe Number
-  , minSize :: Maybe Int
-  , maxSize :: Maybe Int
   }
 
 defaultOpts :: Opts
 defaultOpts =
   { folderPath: "bench-results-vega-lite"
   , indent: 2
-  , minTime: Nothing
-  , maxTime: Nothing
-  , minSize: Nothing
-  , maxSize: Nothing
   }
 
 reportVegaLite_ :: Reporter
@@ -60,7 +48,7 @@ reportVegaLite mkOpts =
       , onGroupFinish = \groupResult -> liftEffect do
           let fileName = sanitizeFileName groupResult.groupName <> ".vl.json"
           let filePath = opts.folderPath <> "/" <> fileName
-          let vegaLiteJson = CA.encode codecVegaLiteSpec $ toVegaLiteSpec opts groupResult
+          let vegaLiteJson = CA.encode codecVegaLiteSpec $ toVegaLiteSpec groupResult
           FS.writeTextFile UTF8 filePath $ stringifyWithIndent opts.indent vegaLiteJson
           Console.log ("Wrote Vega-Lite report to " <> filePath)
       }
@@ -87,8 +75,6 @@ type FieldEncoding =
   { field :: String
   , type :: String
   , title :: String
-  , scale :: Maybe { domain :: Array Number }
-  , axis :: Maybe { tickCount :: Int, values :: Maybe (Array Number) }
   }
 
 type ColorEncoding =
@@ -109,8 +95,8 @@ type DataValue =
   , series :: String
   }
 
-toVegaLiteSpec :: Opts -> GroupResult -> VegaLiteSpec
-toVegaLiteSpec opts { benchResults } =
+toVegaLiteSpec :: GroupResult -> VegaLiteSpec
+toVegaLiteSpec { benchResults } =
   let
     dataValues = Array.concatMap
       ( \{ benchName, samples } ->
@@ -121,30 +107,13 @@ toVegaLiteSpec opts { benchResults } =
             samples
       )
       benchResults
-    
-    -- Calculate min/max from data if not provided
-    sizes = map _.size dataValues
-    times = map _.ms dataValues
-    
-    minSize' = fromMaybe (fromMaybe 0 $ minimum sizes) opts.minSize
-    maxSize' = fromMaybe (fromMaybe 0 $ maximum sizes) opts.maxSize
-    minTime' = fromMaybe (fromMaybe 0.0 $ minimum times) opts.minTime
-    maxTime' = fromMaybe (fromMaybe 0.0 $ maximum times) opts.maxTime
-    
-    xScale = Just { domain: [ Int.toNumber minSize', Int.toNumber maxSize' ] }
-    yScale = Just { domain: [ minTime', maxTime' ] }
-    
-    -- Use actual size values from data for ticks
-    uniqueSizes = Array.sort $ Array.nub sizes
-    xAxis = Just { tickCount: Array.length uniqueSizes, values: Just $ map Int.toNumber uniqueSizes }
-    yAxis = Just { tickCount: 10, values: Nothing }
   in
     { "$schema": "https://vega.github.io/schema/vega-lite/v6.json"
     , data: { values: dataValues }
     , mark: { type: "line", point: true }
     , encoding:
-        { x: { field: "size", type: "quantitative", title: "Size", scale: xScale, axis: xAxis }
-        , y: { field: "ms", type: "quantitative", title: "Time (ms)", scale: yScale, axis: yAxis }
+        { x: { field: "size", type: "quantitative", title: "Size" }
+        , y: { field: "ms", type: "quantitative", title: "Time (ms)" }
         , color:
             { field: "series"
             , type: "nominal"
@@ -185,13 +154,6 @@ codecFieldEncoding = CAR.object "FieldEncoding"
   { field: CA.string
   , type: CA.string
   , title: CA.string
-  , scale: CAP.maybe $ CAR.object "Scale"
-      { domain: CA.array CA.number
-      }
-  , axis: CAP.maybe $ CAR.object "Axis"
-      { tickCount: CA.int
-      , values: CAP.maybe $ CA.array CA.number
-      }
   }
 
 codecColorEncoding :: JsonCodec ColorEncoding

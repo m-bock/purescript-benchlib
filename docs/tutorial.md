@@ -207,6 +207,7 @@ type BenchOpts a' b' a b =
   { iterations :: Int
   , normIn :: a -> a'
   , normOut :: b -> b'
+  , eq :: b -> b -> Boolean
   }
 ```
 
